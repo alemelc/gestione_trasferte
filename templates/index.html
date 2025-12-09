@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Homepage{% endblock %}
+
+{% block content %}
+<div class="p-5 mb-4 bg-light rounded-3">
+    <div class="container-fluid py-5">
+        <h1 class="display-5 fw-bold">Gestione Trasferte Aziendali</h1>
+        <p class="col-md-8 fs-4">Benvenuto nel pannello di gestione. Usa il menu in alto per accedere alle tue
+            funzionalità.</p>
+
+        {% if current_user.is_authenticated %}
+        {% if current_user.ruolo == 'Dirigente' or current_user.ruolo == 'Amministratore' %}
+        <p class="lead">Sei loggato come **{{ current_user.ruolo }}**. Puoi visualizzare le richieste in attesa di
+            approvazione.</p>
+        <a href="#" class="btn btn-success btn-lg">Vai alla Dashboard Approvazioni</a>
+        {% else %}
+        <p class="lead">Sei loggato come **{{ current_user.ruolo }}**. Invia una nuova richiesta di trasferta.</p>
+        <a href="#" class="btn btn-primary btn-lg">Invia Nuova Trasferta</a>
+        {% endif %}
+        {% else %}
+        <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">Inizia (Login)</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
