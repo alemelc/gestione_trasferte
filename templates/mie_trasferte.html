@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Le Tue Trasferte{% endblock %}
+
+{% block content %}
+    <h1>Le Tue Trasferte e Richieste</h1>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {# --- Blocco per il Dipendente --- #}
+    {% if current_user.ruolo == 'Dipendente' %}
+        <h2>Richieste di Trasferta Inviate</h2>
+        {% if trasferte %}
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Data Missione</th>
+                        <th>Destinazione</th>
+                        <th>Stato</th>
+                        <th>Approvatore</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in trasferte %}
+                    <tr>
+                        <td>{{ t.id }}</td>
+                        <td>{{ t.giorno_missione.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ t.missione_presso }}</td>
+                        <td><strong>{{ t.stato_pre_missione }}</strong></td>
+                        <td>{{ t.approvatore_pre.nome if t.approvatore_pre else 'N/A' }}</td>
+                        <td>
+                            <a href="{{ url_for('dettagli_trasferta', trasferta_id=t.id) }}">Dettagli</a>
+                            {# Azione Modifica se lo stato è 'In attesa' #}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="alert alert-info">Non hai ancora inviato richieste di trasferta.</div>
+        {% endif %}
+
+    {# --- Blocco per il Dirigente --- #}
+    {% elif current_user.ruolo == 'Dirigente' %}
+        <h2>Trasferte in Attesa della Tua Approvazione</h2>
+        {% if trasferte %}
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Dipendente</th>
+                        <th>Data Missione</th>
+                        <th>Destinazione</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in trasferte %}
+                    <tr>
+                        <td>{{ t.id }}</td>
+                        {# CORREZIONE: Usiamo t.richiedente.nome invece di t.dipendente.nome #}
+                        <td>{{ t.richiedente.nome }}</td>
+                        <td>{{ t.giorno_missione.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ t.missione_presso }}</td>
+                        <td>
+                            <a href="{{ url_for('approva_trasferta', trasferta_id=t.id) }}" class="btn btn-success btn-sm">Approva</a> 
+                            <a href="{{ url_for('rifiuta_trasferta', trasferta_id=t.id) }}" class="btn btn-danger btn-sm">Rifiuta</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="alert alert-success">Nessuna richiesta di trasferta in attesa di approvazione.</div>
+        {% endif %}
+
+    {% endif %}
+
+    <p class="mt-4"><a href="{{ url_for('index') }}">Torna alla Dashboard</a></p>
+{% endblock %}
