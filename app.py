@@ -934,7 +934,7 @@ def associa_dirigente():
                             dipendenti=dipendenti, 
                             dirigenti=dirigenti)
 
-# Aggiungi queste rotte placeholder in app.py
+
 
 @app.route('/dettagli_trasferta/<int:trasferta_id>')
 @login_required

@@ -41,7 +41,7 @@ def setup_database_and_users():
 
         # 2. Creazione Utenti
         for key, (nome, cognome, email, raw_pwd, ruolo, id_dirigente) in USERS_DATA.items():
-            hashed_pwd = generate_password_hash(raw_pwd, method='pbkdf2:sha256')
+            hashed_pwd = generate_password_hash(raw_pwd, method='scrypt')
             
             new_user = Dipendente(
                 nome=nome,
