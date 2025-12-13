@@ -1,49 +1,45 @@
 import os
 from dotenv import load_dotenv
 from app import app
-from models import db, Dipendente # Assicurati che db e Dipendente siano importati correttamente
+from models import db, Dipendente
 from werkzeug.security import generate_password_hash
 
-# Credenziali (usa quelle che hai provato)
+# Carica le variabili d'ambiente (per Render e ambiente locale)
+load_dotenv()
+
+# Legge le credenziali con fallback (meglio usare le variabili d'ambiente su Render!)
 ADMIN_USERNAME = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "PasswordSicura123")
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@tuodominio.it")
 
 def create_admin_user():
+    """Crea l'utente amministratore se non esiste già."""
     with app.app_context():
         
-        # --- BLOCCO DI ELIMINAZIONE FORZATA (TEMPORANEO!) ---
-        # 1. Trova l'utente Admin esistente
+        # 1. Controlla se l'utente esiste già (Ricerca per email, che è corretto)
         existing_admin = Dipendente.query.filter_by(email=ADMIN_EMAIL).first()
-        
-        # 2. Se l'utente esiste, eliminalo
         if existing_admin:
-            print(f"Eliminazione forzata dell'utente '{existing_admin.email}' (ID: {existing_admin.id}) per rigenerazione password.")
-            db.session.delete(existing_admin)
-            db.session.commit()
-            
-        print("-------------------------------------------------------------------")
-        
-        # 3. Controlla di nuovo per assicurarti che non ci siano utenti con quel nome
-        if Dipendente.query.filter_by(email=ADMIN_EMAIL).first():
-            print(f"ERRORE GRAVE: Utente {ADMIN_EMAIL} non eliminato.")
+            # Utente trovato, non fare nulla (questa è la logica di sicurezza)
+            print(f"Utente amministratore '{existing_admin.email}' esiste già. Nessuna azione necessaria.")
             return
-
-        # -------------------------------------------------------------------
-
+            
         print(f"Creazione utente amministratore '{ADMIN_EMAIL}' e hashing password...")
         
-        # Crea l'utente da zero
+        # 2. Crea l'utente da zero
         hashed_password = generate_password_hash(ADMIN_PASSWORD)
         admin = Dipendente(
-            #username=ADMIN_USERNAME,
             password_hash=hashed_password,
             nome="Admin",
             cognome="System",
             email=ADMIN_EMAIL, # Usa questa email per il login!
             ruolo='Admin',
-            
+            # Se hai aggiunto il campo is_attivo al modello, lascialo.
+            # Altrimenti, DEVE essere rimosso (come da ultima correzione).
+            # Dato che hai detto che funziona, lo lasciamo.
+            # is_attivo=True 
         )
+        
+        # Aggiungi e committa
         db.session.add(admin)
         db.session.commit()
         print("Utente amministratore creato con successo!")
