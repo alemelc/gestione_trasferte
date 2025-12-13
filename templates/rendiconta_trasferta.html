@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Rendicontazione Post Missione{% endblock %}
+
+{% block content %}
+<h1>Rendicontazione Missione ID: {{ trasferta.id }}</h1>
+
+<p class="lead">Compila i dettagli effettivi della missione del {{ trasferta.giorno_missione.strftime('%Y-%m-%d') }}.
+</p>
+
+<form method="POST">
+
+    {# SEZIONE ORARI EFFETTIVI #}
+    <h2>Orari e Durata</h2>
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label for="ora_inizio_effettiva" class="form-label">Inizio Missione (Ora effettiva)</label>
+            <input type="time" class="form-control" id="ora_inizio_effettiva" name="ora_inizio_effettiva" required>
+        </div>
+        <div class="col-md-3">
+            <label for="ora_fine_effettiva" class="form-label">Fine Missione (Ora effettiva)</label>
+            <input type="time" class="form-control" id="ora_fine_effettiva" name="ora_fine_effettiva" required>
+        </div>
+        <div class="col-md-3">
+            <label for="pernotto" class="form-label">Pernottamento</label>
+            <select class="form-select" id="pernotto" name="pernotto">
+                <option value="no">NO</option>
+                <option value="si">SI</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label for="durata_viaggio_andata" class="form-label">Durata Viaggio Andata (minuti)</label>
+            <input type="number" class="form-control" id="durata_viaggio_andata" name="durata_viaggio_andata">
+        </div>
+        <div class="col-md-3">
+            <label for="durata_viaggio_ritorno" class="form-label">Durata Viaggio Ritorno (minuti)</label>
+            <input type="number" class="form-control" id="durata_viaggio_ritorno" name="durata_viaggio_ritorno">
+        </div>
+    </div>
+
+    <hr>
+
+    {# SEZIONE KM E PERCORSO #}
+    <h2>Mezzi e Chilometri</h2>
+    <div class="mb-3">
+        <label for="mezzo_km_percorsi" class="form-label">Mezzo KM Percorsi</label>
+        <select class="form-select" id="mezzo_km_percorsi" name="mezzo_km_percorsi" required>
+            <option value="">Seleziona...</option>
+            <option value="MEZZI GRATUITI">Mezzi Gratuiti</option>
+            <option value="FERROVIA">Ferrovia</option>
+            <option value="MEZZI DI LINEA">Mezzi di Linea</option>
+            <option value="MEZZI PROPRI">Mezzi Propri</option>
+        </select>
+    </div>
+    <div class="mb-3">
+        <label for="km_percorsi" class="form-label">KM Percorsi</label>
+        <input type="number" step="0.1" class="form-control" id="km_percorsi" name="km_percorsi">
+    </div>
+    <div class="mb-3">
+        <label for="percorso_effettuato" class="form-label">Percorso Effettuato</label>
+        <textarea class="form-control" id="percorso_effettuato" name="percorso_effettuato" rows="2" required></textarea>
+    </div>
+
+    <hr>
+
+    {# SEZIONE PAUSA PRANZO #}
+    <h2>Pausa e Rimborso</h2>
+    <div class="mb-3">
+        <label for="richiesta_pausa_pranzo" class="form-label">Richiesta Pausa Pranzo</label>
+        <select class="form-select" id="richiesta_pausa_pranzo" name="richiesta_pausa_pranzo" required>
+            <option value="NESSUNA PAUSA PRANZO">Nessuna Pausa Pranzo</option>
+            <option value="BUONO PASTO">Buono Pasto</option>
+            <option value="RIMBORSO SPESE">Rimborso Spese</option>
+        </select>
+        <small class="form-text text-muted">Il Rimborso Spese è possibile solo se la durata è > 8 ore.</small>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label for="pausa_pranzo_dalle" class="form-label">Pausa Pranzo Dalle Ore</label>
+            <input type="time" class="form-control" id="pausa_pranzo_dalle" name="pausa_pranzo_dalle">
+        </div>
+        <div class="col-md-3">
+            <label for="pausa_pranzo_alle" class="form-label">Pausa Pranzo Alle Ore</label>
+            <input type="time" class="form-control" id="pausa_pranzo_alle" name="pausa_pranzo_alle">
+        </div>
+    </div>
+
+    <hr>
+
+    {# SEZIONE EXTRA ORARIO #}
+    <h2>Extra Orario</h2>
+    <div class="mb-3">
+        <label for="extra_orario" class="form-label">Gestione Ore in Esibero</label>
+        <select class="form-select" id="extra_orario" name="extra_orario" required>
+            <option value="EXTRA ORARIO NON PRESENTE">Extra Orario Non Presente</option>
+            <option value="PLUS ORARIO">Plus Orario</option>
+            <option value="LAVORO STRAORDINARIO">Lavoro Straordinario</option>
+            <option value="RECUPERO TASTO 4">Recupero Tasto 4</option>
+        </select>
+    </div>
+
+    <hr>
+
+    {# SEZIONE NOTE E RAPPORTO FINALE #}
+    <h2>Rapporto Finale e Note</h2>
+    <div class="mb-3">
+        <label for="note_rendicontazione" class="form-label">Note Aggiuntive e Rapporto Finale</label>
+        <textarea class="form-control" id="note_rendicontazione" name="note_rendicontazione" rows="5"
+            placeholder="Descrivi brevemente il lavoro svolto, eventuali imprevisti o aggiungi note relative alle spese.">{{ trasferta.note_rendicontazione or '' }}</textarea>
+    </div>
+
+    <hr>
+
+
+    <button type="submit" class="btn btn-primary">Invia Rendicontazione e Richiesta Rimborso</button>
+    <a href="{{ url_for('mie_trasferte') }}" class="btn btn-secondary">Annulla</a>
+</form>
+{% endblock %}

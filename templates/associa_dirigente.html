@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Associazione Dirigenti{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Gestione Assegnazione Dirigenti</h2>
+    <p class="text-muted">Associa ogni dipendente al suo dirigente responsabile per attivare il flusso di approvazione delle trasferte.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-4">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Assegna o Rimuovi Responsabile</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('associa_dirigente') }}">
+                        
+                        <div class="mb-3">
+                            <label for="dipendente_id" class="form-label">Dipendente da Assegnare</label>
+                            <select name="dipendente_id" id="dipendente_id" class="form-select" required>
+                                <option value="">--- Seleziona Dipendente ---</option>
+                                {% for d in dipendenti %}
+                                    {# Prepara le variabili per la visualizzazione chiara #}
+                                    {% set attuale_resp = d.dirigente_responsabile %}
+                                    {% set resp_label = attuale_resp.cognome ~ ' ' ~ attuale_resp.nome if attuale_resp else 'Nessuno' %}
+
+                                    <option value="{{ d.id }}"
+                                        {% if d.ruolo == 'Dirigente' %} class="fw-bold" {% endif %}
+                                    >
+                                        {# Visualizzazione Completa: Cognome Nome (Ruolo) - Attuale Resp: [Nome] #}
+                                        {{ d.cognome }} {{ d.nome }} ({{ d.ruolo }}) - Attuale Resp: {{ resp_label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="dirigente_id" class="form-label">Dirigente Responsabile (Nuova Assegnazione)</label>
+                            <select name="dirigente_id" id="dirigente_id" class="form-select" required>
+                                <option value="0">--- Rimuovi Assegnazione ---</option>
+                                {% for d in dirigenti %}
+                                    <option value="{{ d.id }}">
+                                        {{ d.cognome }} {{ d.nome }} ({{ d.ruolo }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">Salva Assegnazione</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Stato Attuale delle Assegnazioni</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped table-sm">
+                        <thead>
+                            <tr>
+                                <th>Dipendente</th>
+                                <th>Ruolo</th>
+                                <th>Dirigente Responsabile</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {# Dipendenti contiene la lista filtrata (senza Admin) #}
+                            {% for d in dipendenti %}
+                            <tr>
+                                <td>{{ d.cognome }} {{ d.nome }}</td>
+                                <td><span class="badge bg-{{ 'danger' if d.ruolo == 'Dirigente' else 'info' }}">{{ d.ruolo }}</span></td>
+                                <td>
+                                    {% if d.dirigente_responsabile %}
+                                        <span class="text-success fw-bold">{{ d.dirigente_responsabile.cognome }} {{ d.dirigente_responsabile.nome }}</span>
+                                    {% else %}
+                                        <span class="text-danger">NON ASSEGNATO</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

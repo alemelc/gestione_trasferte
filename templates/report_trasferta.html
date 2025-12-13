@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Report Missione #{{ trasferta.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5 printable-area">
+
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white text-center">
+                    <h4 class="mb-0">REPORT COMPLETO DI MISSIONE E RENDICONTO</h4>
+                    <p class="mb-0">ID Missione: <strong>{{ trasferta.id }}</strong></p>
+                </div>
+                <div class="card-body">
+
+                    <h5 class="mt-3 mb-3 text-primary border-bottom pb-1">Dati Missione & Stato</h5>
+                    <table class="table table-bordered table-sm">
+                        <tbody>
+                            <tr>
+                                <td style="width: 30%;"><strong>Richiedente:</strong></td>
+                                <td>{{ trasferta.richiedente.nome }} {{ trasferta.richiedente.cognome }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Data Missione:</strong></td>
+                                <td>{{ trasferta.giorno_missione.strftime('%d/%m/%Y') }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Destinazione (Presso):</strong></td>
+                                <td>{{ trasferta.missione_presso }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Motivazione:</strong></td>
+                                <td>{{ trasferta.motivo_missione or 'N/D' }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Stato Pre-Missione:</strong></td>
+                                <td><span
+                                        class="badge bg-{{ 'success' if trasferta.stato_pre_missione == 'Approvata' else 'danger' if trasferta.stato_pre_missione == 'Rifiutata' else 'warning' }}">{{
+                                        trasferta.stato_pre_missione }}</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Approvato Pre da:</strong></td>
+                                <td>{{ trasferta.approvatore_pre.nome }} {{ trasferta.approvatore_pre.cognome }} (ID: {{
+                                    trasferta.id_approvatore_pre or 'N/D' }})</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h5 class="mt-4 mb-3 text-primary border-bottom pb-1">Dettagli di Rendicontazione</h5>
+
+                    {% if trasferta.stato_post_missione != 'N/A' %}
+                    <table class="table table-bordered table-sm">
+                        <tr>
+                            <td style="width: 30%;"><strong>Orario Effettivo Missione:</strong></td>
+                            <td>
+                                {% if trasferta.ora_inizio_effettiva and trasferta.ora_fine_effettiva %}
+                                Dalle {{ trasferta.ora_inizio_effettiva.strftime('%H:%M') }} alle {{
+                                trasferta.ora_fine_effettiva.strftime('%H:%M') }} (Durata: {{
+                                trasferta.durata_totale_ore or 'N/D' }} ore)
+                                {% else %}
+                                N/D
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Pernotto:</strong></td>
+                            <td>{{ 'Sì' if trasferta.pernotto else 'No' }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Durata Viaggio A/R (min):</strong></td>
+                            <td>
+                                Andata: {{ trasferta.durata_viaggio_andata_min or 'N/D' }} min |
+                                Ritorno: {{ trasferta.durata_viaggio_ritorno_min or 'N/D' }} min
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Chilometri Percorsi (Km):</strong></td>
+                            <td>{{ trasferta.km_percorsi or 'N/D' }} Km</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Mezzo Utilizzato:</strong></td>
+                            <td>{{ trasferta.mezzo_km_percorsi or 'N/D' }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Percorso Effettuato:</strong></td>
+                            <td>{{ trasferta.percorso_effettuato or 'Non specificato' }}</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Gestione Pausa Pranzo:</strong></td>
+                            <td>{{ trasferta.richiesta_pausa_pranzo or 'N/D' }}</td>
+                        </tr>
+                        {% if trasferta.pausa_pranzo_dalle and trasferta.pausa_pranzo_alle %}
+                        <tr>
+                            <td><strong>Orario Pausa Pranzo:</strong></td>
+                            <td>Dalle {{ trasferta.pausa_pranzo_dalle.strftime('%H:%M') }} alle {{
+                                trasferta.pausa_pranzo_alle.strftime('%H:%M') }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td><strong>Gestione Extra Orario:</strong></td>
+                            <td>{{ trasferta.extra_orario or 'N/D' }}</td>
+                        </tr>
+                        {% if trasferta.note_rendicontazione %}
+                        <tr>
+                            <th>**Rapporto Finale / Note**</th>
+                            <td>{{ trasferta.note_rendicontazione | replace('\n', '<br>') | safe }}</td>
+                        </tr>
+                        {% endif %}
+
+                    </table>
+                    <!--
+                    {% else %}
+                        <div class="alert alert-warning">Il rendiconto post-missione non è ancora stato compilato.</div>
+                    {% endif %}
+                    -->
+
+                    <h5 class="mt-4 mb-3 text-primary border-bottom pb-1">Approvazione Post-Missione</h5>
+                    <table class="table table-bordered table-sm">
+                        <tbody>
+                            <tr>
+                                <td style="width: 30%;"><strong>Stato Finale:</strong></td>
+                                <td><span
+                                        class="badge bg-{{ 'success' if trasferta.stato_post_missione in ['Da rimborsare', 'Rimborso Concesso'] else 'danger' if trasferta.stato_post_missione == 'Rimborso negato' else 'info' }}">{{
+                                        trasferta.stato_post_missione }}</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Approvato Post da:</strong></td>
+                                <td>{{ trasferta.approvatore_post.nome }} {{ trasferta.approvatore_post.cognome }} (ID:
+                                    {{ trasferta.id_approvatore_post or 'N/D' }})</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="mt-4 text-center">
+                        <button class="btn btn-secondary btn-lg d-print-none" onclick="window.print()">Stampa
+                            Report</button>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block custom_scripts %}
+<style>
+    /* Nasconde la barra di navigazione e altri elementi non stampabili */
+    @media print {
+
+        .navbar,
+        .footer,
+        .d-print-none,
+        .alert {
+            display: none !important;
+        }
+
+        .printable-area {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        body {
+            background-color: #fff;
+        }
+    }
+</style>
+{% endblock %}

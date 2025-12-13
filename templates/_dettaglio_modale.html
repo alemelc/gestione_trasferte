@@ -1,0 +1,120 @@
+{# templates/_dettaglio_modale.html #}
+<table class="table table-sm table-bordered">
+
+    {# BLOCCO INFORMAZIONI GENERALI E RICHIESTA #}
+    <tr>
+        <th>Richiedente</th>
+        <td>{{ trasferta.richiedente.nome }} {{ trasferta.richiedente.cognome }}</td>
+    </tr>
+    <tr>
+        <th>Data Missione</th>
+        <td>{{ trasferta.giorno_missione.strftime('%d/%m/%Y') }}</td>
+    </tr>
+    <tr>
+        <th>Destinazione</th>
+        <td>{{ trasferta.missione_presso }}</td>
+    </tr>
+    <tr>
+        <th>Motivo missione</th>
+        <td>{{ trasferta.motivo_missione }}</td>
+    </tr>
+    <tr>
+        <th>Utilizzo mezzo</th>
+        <td>{{ trasferta.utilizzo_mezzo }}</td>
+    </tr>
+    <tr>
+        <th>Aut extra orario</th>
+        <td>{{ trasferta.aut_extra_orario }}</td>
+    </tr>
+    <tr>
+        <th>Aut timbratura entrata</th>
+        <td>{% if trasferta.aut_timbratura_entrata %}
+            {{ trasferta.aut_timbratura_entrata.strftime('%H:%M') }}
+            {% else %}
+            Non Specificato
+            {% endif %}
+        </td>
+    </tr>
+    <tr>
+        <th>Aut timbratura uscita</th>
+        <td>{% if trasferta.aut_timbratura_uscita %}
+            {{ trasferta.aut_timbratura_uscita.strftime('%H:%M') }}
+            {% else %}
+            Non Specificato
+            {% endif %}</td>
+    </tr>
+    <tr>
+        <th>Motivo timbratura</th>
+        <td>{{ trasferta.motivo_timbratura }}</td>
+    </tr>
+    {% if trasferta.note_premissione %}
+    <tr>
+        <th>Note Richiesta</th>
+        {# Usiamo replace('\n', '<br>') e safe per formattare correttamente i salti di riga #}
+        <td>{{ trasferta.note_premissione | replace('\n', '<br>') | safe }}</td>
+    </tr>
+    {% endif %}
+
+
+    {# BLOCCO INFORMAZIONI DI STATO #}
+    <tr>
+        <th>Stato Pre-Missione</th>
+        <td>{{ trasferta.stato_pre_missione }}</td>
+    </tr>
+    <tr>
+        <th>Stato Post-Missione</th>
+        <td>{{ trasferta.stato_post_missione }}</td>
+    </tr>
+
+
+    {# 🚨 BLOCCO INFORMAZIONI DI RENDICONTAZIONE (POST-MISSIONE) #}
+        {% if trasferta.stato_post_missione == 'In attesa' or trasferta.stato_post_missione in ['Da rimborsare',
+    'Rimborso Concesso', 'Rimborso negato'] %}
+        <tr class="table-success mt-3">
+                <th colspan="2" class="text-center">Dati di Rendicontazione</th>
+            </tr>
+
+        <tr>
+                <th>Orari Effettivi</th>
+                <td>
+                        Inizio: {{ trasferta.ora_inizio_effettiva.strftime('%H:%M') if trasferta.ora_inizio_effettiva
+            else 'N/A' }} /
+                        Fine: {{ trasferta.ora_fine_effettiva.strftime('%H:%M') if trasferta.ora_fine_effettiva else
+            'N/A' }}
+                    </td>
+            </tr>
+        <tr>
+                <th>Durata Totale (Ore)</th>
+                <td>{{ trasferta.durata_totale_ore or 'N/A' }}</td>
+            </tr>
+        <tr>
+                <th>KM Percorsi</th>
+                <td>{{ trasferta.km_percorsi or '0.0' }}</td>
+            </tr>
+        <tr>
+                <th>Mezzo KM Percorsi</th>
+                <td>{{ trasferta.mezzo_km_percorsi or 'N/A' }}</td>
+            </tr>
+        <tr>
+                <th>Percorso Effettuato</th>
+                <td>{{ trasferta.percorso_effettuato or 'N/A' }}</td>
+            </tr>
+        <tr>
+                <th>Richiesta Pausa Pranzo</th>
+                <td>{{ trasferta.richiesta_pausa_pranzo or 'Nessuna' }}</td>
+            </tr>
+        <tr>
+                <th>Extra Orario Richiesto</th>
+                <td>{{ trasferta.extra_orario or 'Nessuno' }}</td>
+            </tr>
+        {% if trasferta.note_rendicontazione %}
+        <tr>
+                <th>Note Rendiconto</th>
+                <td>{{ trasferta.note_rendicontazione | replace('\n', '<br>') | safe }}</td>
+            </tr>
+        {% endif %}
+        {# FINE CAMPI DI RENDICONTAZIONE #}
+
+        {% endif %}
+
+</table>

@@ -3,86 +3,94 @@
 {% block title %}Nuova Richiesta Trasferta (Fase 1){% endblock %}
 
 {% block content %}
-    <h2 class="mb-4">Invia Richiesta di Trasferta (FASE 1: PRE MISSIONE)</h2>
-    <p class="text-muted">I dati inseriti saranno inviati al tuo Dirigente Responsabile per l'autorizzazione preventiva.</p>
-    
-    <form method="POST">
-        
-        <fieldset class="p-3 mb-4 border rounded">
-            <legend class="float-none w-auto px-2 fs-5">Dettagli Missione</legend>
+<h2 class="mb-4">Invia Richiesta di Trasferta (FASE 1: PRE MISSIONE)</h2>
+<p class="text-muted">I dati inseriti saranno inviati al tuo Dirigente Responsabile per l'autorizzazione preventiva.</p>
 
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="giorno_missione" class="form-label">GIORNO MISSIONE</label>
-                    <input type="date" class="form-control" id="giorno_missione" name="giorno_missione" required>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label for="inizio_missione_ora" class="form-label">INIZIO MISSIONE ORE (HH:MM)</label>
-                    <input type="time" class="form-control" id="inizio_missione_ora" name="inizio_missione_ora" required>
-                </div>
-            </div>
+<form method="POST">
 
-            <div class="mb-3">
-                <label for="missione_presso" class="form-label">MISSIONE PRESSO</label>
-                <input type="text" class="form-control" id="missione_presso" name="missione_presso" required>
-            </div>
-            <div class="mb-3">
-                <label for="motivo_missione" class="form-label">MOTIVO MISSIONE</label>
-                <textarea class="form-control" id="motivo_missione" name="motivo_missione" rows="2" required></textarea>
-            </div>
-        </fieldset>
+    <fieldset class="p-3 mb-4 border rounded">
+        <legend class="float-none w-auto px-2 fs-5">Dettagli Missione</legend>
 
-        <fieldset class="p-3 mb-4 border rounded">
-            <legend class="float-none w-auto px-2 fs-5">Logistica e Mezzo</legend>
-            <div class="mb-3">
-                <label class="form-label d-block">UTILIZZO MEZZO</label>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="utilizzo_mezzo" id="mezzo_pubblico" value="PUBBLICO" required>
-                    <label class="form-check-label" for="mezzo_pubblico">Pubblico</label>
-                </div>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="utilizzo_mezzo" id="mezzo_proprio" value="PROPRIO">
-                    <label class="form-check-label" for="mezzo_proprio">Proprio</label>
-                </div>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="utilizzo_mezzo" id="mezzo_amministrazione" value="AMMINISTRAZIONE">
-                    <label class="form-check-label" for="mezzo_amministrazione">Amministrazione</label>
-                </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="giorno_missione" class="form-label">GIORNO MISSIONE</label>
+                <input type="date" class="form-control" id="giorno_missione" name="giorno_missione" required>
             </div>
-        </fieldset>
+            <div class="col-md-6 mb-3">
+                <label for="inizio_missione_ora" class="form-label">INIZIO MISSIONE ORE (HH:MM)</label>
+                <input type="time" class="form-control" id="inizio_missione_ora" name="inizio_missione_ora" required>
+            </div>
+        </div>
 
-        <fieldset class="p-3 mb-4 border rounded">
-            <legend class="float-none w-auto px-2 fs-5">Autorizzazioni Speciali</legend>
+        <div class="mb-3">
+            <label for="missione_presso" class="form-label">MISSIONE PRESSO</label>
+            <input type="text" class="form-control" id="missione_presso" name="missione_presso" required>
+        </div>
+        <div class="mb-3">
+            <label for="motivo_missione" class="form-label">MOTIVO MISSIONE</label>
+            <textarea class="form-control" id="motivo_missione" name="motivo_missione" rows="2" required></textarea>
+        </div>
+    </fieldset>
 
-            <div class="mb-3">
-                <label class="form-label d-block">EVENTUALE STRAORDINARIO AUTORIZZATO</label>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="aut_extra_orario" id="extra_si" value="si" required>
-                    <label class="form-check-label" for="extra_si">SÌ</label>
-                </div>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="aut_extra_orario" id="extra_no" value="no" checked>
-                    <label class="form-check-label" for="extra_no">NO</label>
-                </div>
+    <fieldset class="p-3 mb-4 border rounded">
+        <legend class="float-none w-auto px-2 fs-5">Logistica e Mezzo</legend>
+        <div class="mb-3">
+            <label class="form-label d-block">UTILIZZO MEZZO</label>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="utilizzo_mezzo" id="mezzo_pubblico" value="PUBBLICO"
+                    required>
+                <label class="form-check-label" for="mezzo_pubblico">Pubblico</label>
             </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="utilizzo_mezzo" id="mezzo_proprio" value="PROPRIO">
+                <label class="form-check-label" for="mezzo_proprio">Proprio</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="utilizzo_mezzo" id="mezzo_amministrazione"
+                    value="AMMINISTRAZIONE">
+                <label class="form-check-label" for="mezzo_amministrazione">Amministrazione</label>
+            </div>
+        </div>
+    </fieldset>
 
-            <h5 class="mt-4">Autorizzazione Timbratura</h5>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="aut_timbratura_entrata" class="form-label">TIMBRATURA ENTRATA AUTORIZZATA ALLE ORE</label>
-                    <input type="time" class="form-control" id="aut_timbratura_entrata" name="aut_timbratura_entrata">
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label for="aut_timbratura_uscita" class="form-label">TIMBRATURA USCITA AUTORIZZATA ALLE ORE</label>
-                    <input type="time" class="form-control" id="aut_timbratura_uscita" name="aut_timbratura_uscita">
-                </div>
+    <fieldset class="p-3 mb-4 border rounded">
+        <legend class="float-none w-auto px-2 fs-5">Autorizzazioni Speciali</legend>
+
+        <div class="mb-3">
+            <label class="form-label d-block">EVENTUALE STRAORDINARIO AUTORIZZATO</label>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="aut_extra_orario" id="extra_si" value="si" required>
+                <label class="form-check-label" for="extra_si">SÌ</label>
             </div>
-            <div class="mb-3">
-                <label for="motivo_timbratura" class="form-label">MOTIVO AUTORIZZAZIONE TIMBRATURA (Obbligatorio se si specificano le ore)</label>
-                <textarea class="form-control" id="motivo_timbratura" name="motivo_timbratura" rows="1"></textarea>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="aut_extra_orario" id="extra_no" value="no" checked>
+                <label class="form-check-label" for="extra_no">NO</label>
             </div>
-        </fieldset>
-        
-        <button type="submit" class="btn btn-primary btn-lg">Invia Richiesta Pre-Missione</button>
-    </form>
+        </div>
+
+        <h5 class="mt-4">Autorizzazione Timbratura</h5>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="aut_timbratura_entrata" class="form-label">TIMBRATURA ENTRATA AUTORIZZATA ALLE ORE</label>
+                <input type="time" class="form-control" id="aut_timbratura_entrata" name="aut_timbratura_entrata">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="aut_timbratura_uscita" class="form-label">TIMBRATURA USCITA AUTORIZZATA ALLE ORE</label>
+                <input type="time" class="form-control" id="aut_timbratura_uscita" name="aut_timbratura_uscita">
+            </div>
+        </div>
+        <div class="mb-3">
+            <label for="motivo_timbratura" class="form-label">MOTIVO AUTORIZZAZIONE TIMBRATURA (Obbligatorio se si
+                specificano le ore)</label>
+            <textarea class="form-control" id="motivo_timbratura" name="motivo_timbratura" rows="1"></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="note_premissione" class="form-label">NOTE PRE-MISSIONE</label>
+            <textarea class="form-control" id="note_premissione" name="note_premissione" rows="1"></textarea>
+        </div>
+
+    </fieldset>
+
+    <button type="submit" class="btn btn-primary btn-lg">Invia Richiesta Pre-Missione</button>
+</form>
 {% endblock %}

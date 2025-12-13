@@ -3,45 +3,52 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-    <h1>Benvenuto, {{ current_user.nome }}!</h1>
-    <p>Il tuo ruolo nel sistema è: <strong>{{ current_user.ruolo }}</strong>.</p>
-    
-    <hr>
+<h1>Benvenuto, {{ current_user.nome }}!</h1>
+<p>Il tuo ruolo nel sistema è: <strong>{{ current_user.ruolo }}</strong>.</p>
 
-    {% if current_user.ruolo == 'Dipendente' %}
-        <h2>Azioni Dipendente</h2>
-        <ul>
-            <li><a href="{{ url_for('nuova_trasferta') }}">
-                <strong>Invia Nuova Richiesta di Trasferta</strong>
-            </a></li>
-            <li><a href="{{ url_for('mie_trasferte') }}">Visualizza lo stato delle tue richieste</a></li>
-        </ul>
+<hr>
 
-        {% if dirigente_assegnato %}
-            <p class="alert alert-success">
-                Il tuo Dirigente Responsabile per l'approvazione è: 
-               <strong>{{ dirigente_assegnato.nome }}</strong> (Email: {{ dirigente_assegnato.email }})
-            </p>
-        {% else %}
-            <div class="alert alert-warning">
-                Attenzione: Non hai un dirigente assegnato. La tua richiesta potrebbe non essere approvata.
-            </div>
-        {% endif %}
+{% if current_user.ruolo == 'Dipendente' %}
+<h2>Azioni Dipendente</h2>
+<ul>
+    <li><a href="{{ url_for('nuova_trasferta') }}">
+            <strong>Invia Nuova Richiesta di Trasferta</strong>
+        </a></li>
+    <li><a href="{{ url_for('mie_trasferte') }}">Visualizza lo stato delle tue richieste</a></li>
+</ul>
+
+{% if dirigente_assegnato %}
+<p class="alert alert-success">
+    Il tuo Dirigente Responsabile per l'approvazione è:
+    <strong>{{ dirigente_assegnato.nome }}</strong> (Email: {{ dirigente_assegnato.email }})
+</p>
+{% else %}
+<div class="alert alert-warning">
+    Attenzione: Non hai un dirigente assegnato. La tua richiesta potrebbe non essere approvata.
+</div>
+{% endif %}
 
 
-    {% elif current_user.ruolo == 'Dirigente' %}
-        <h2>Azioni Dirigente</h2>
-        <ul>
-            <li><a href="{{ url_for('mie_trasferte') }}"><strong>Vedi Trasferte da Approvare</strong></a></li>
-            <li>Gestione Deleghe (Non ancora implementata)</li>
-        </ul>
+{% elif current_user.ruolo == 'Dirigente' %}
+<h2>Azioni Dirigente</h2>
+<ul>
+    {# ✅ NUOVA AGGIUNTA: Il Dirigente può inviare una richiesta (auto-autorizzata) #}
+    <li><a href="{{ url_for('nuova_trasferta') }}">
+            <strong>Invia Nuova Richiesta di Trasferta</strong>
+        </a></li>
 
-    {% elif current_user.ruolo == 'Amministrazione' %}
-        <h2>Azioni Amministrazione</h2>
-        <ul>
-            <li>Vedi tutte le trasferte rendicontate (Non ancora implementato)</li>
-        </ul>
+    <li><a href="{{ url_for('mie_trasferte') }}"><strong>Vedi Trasferte da Approvare</strong></a></li>
 
-    {% endif %}
+    {# Link Gestione Deleghe Attivo #}
+    <li><a href="{{ url_for('gestisci_deleghe') }}">Gestione Deleghe</a></li>
+</ul>
+
+{% elif current_user.ruolo == 'Amministrazione' %}
+<h2>Azioni Amministrazione</h2>
+<ul>
+    <li>Vedi tutte le trasferte rendicontate (Non ancora implementato)</li>
+</ul>
+
+{% endif %}
 
 {% endblock %}

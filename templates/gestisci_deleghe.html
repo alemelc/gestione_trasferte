@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Gestione Deleghe Approvazione{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Gestione delle Tue Deleghe</h2>
+    <p class="text-muted">Da qui puoi delegare temporaneamente il tuo potere di approvazione ad un altro dipendente.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-4">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="row">
+        
+        <div class="col-md-4">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Crea Nuova Delega</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('gestisci_deleghe') }}">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            {{ form.delegato_id.label(class="form-label") }}
+                            {{ form.delegato_id(class="form-select") }}
+                            {% for error in form.delegato_id.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.data_inizio.label(class="form-label") }}
+                            {{ form.data_inizio(class="form-control") }}
+                            {% for error in form.data_inizio.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.data_fine.label(class="form-label") }}
+                            {{ form.data_fine(class="form-control") }}
+                            <small class="form-text text-muted">Lascia vuoto per una delega a tempo indeterminato (fino a revoca).</small>
+                            {% for error in form.data_fine.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        {{ form.submit(class="btn btn-success w-100") }}
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            
+            <div class="card shadow mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Deleghe Attive e Future ({{ deleghe_attive|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if deleghe_attive %}
+                        <ul class="list-group">
+                            {% for delega in deleghe_attive %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold">{{ delega.delegato.nome }} {{ delega.delegato.cognome }}</span>
+                                    <span class="text-muted small mx-3">
+                                        Dal {{ delega.data_inizio.strftime('%d/%m/%Y') }} 
+                                        {% if delega.data_fine %}
+                                            al {{ delega.data_fine.strftime('%d/%m/%Y') }}
+                                        {% else %}
+                                            (Indeterminata)
+                                        {% endif %}
+                                    </span>
+                                    
+                                    {# CONTROLLO STATO VISIVO #}
+                                    <span class="badge bg-{{ 'primary' if delega.data_inizio > oggi else 'success' }} me-auto">
+                                        {% if delega.data_inizio > oggi %}
+                                            Futura (Inizio il {{ delega.data_inizio.strftime('%d/%m') }})
+                                        {% else %}
+                                            Attiva
+                                        {% endif %}
+                                    </span>
+
+                                   {# FORM per la REVOCA (solo se Attiva o Futura non ancora scaduta) #}
+                                    {% if delega.data_fine is none or delega.data_fine >= oggi %}
+                                        <form method="POST" action="{{ url_for('revoca_delega', delega_id=delega.id) }}" style="display:inline;" onsubmit="return confirm('Sei sicuro di voler revocare immediatamente la delega a {{ delega.delegato.nome }}?');">
+                                            <button type="submit" class="btn btn-sm btn-danger">Revoca</button>
+                                        </form>
+                                    {% endif %}                                      
+                                    
+                                    
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted">Nessuna delega attiva o futura.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}  ```
