@@ -240,6 +240,7 @@ def logout():
 def register():
     if request.method == 'POST':
         nome = request.form.get('nome')
+        cognome = request.form.get('cognome')
         email = request.form.get('email')
         password = request.form.get('password')
         ruolo = request.form.get('ruolo', 'Dipendente') # Default a Dipendente
@@ -249,7 +250,7 @@ def register():
             return redirect(url_for('register'))
 
         hashed_password = generate_password_hash(password, method='scrypt')
-        new_user = Dipendente(nome=nome, email=email, password_hash=hashed_password, ruolo=ruolo)
+        new_user = Dipendente(nome=nome, cognome=cognome, email=email, password_hash=hashed_password, ruolo=ruolo)
         
         try:
             db.session.add(new_user)
