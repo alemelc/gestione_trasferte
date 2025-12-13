@@ -16,32 +16,38 @@ from datetime import datetime, timedelta, date, time
 from sqlalchemy.orm import joinedload # Importa joinedload
 from functools import wraps
 
-
-# Configurazione del Database
-# Priorità: Ambiente (Render) > File .env (Locale)
-db_url = os.environ.get("DATABASE_URL")
-
-# Se DATABASE_URL non è definito (es. se sei ancora nel vecchio setup), usa SQLite di default
-if not db_url:
-    db_url = 'sqlite:///app.db'
-    
-# Assicurati di usare l'URI configurato
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url 
-# ...
-
-
 # ====================================================================
 # 2. CONFIGURAZIONE E CREAZIONE ISTANZE PRINCIPALI
 # ====================================================================
 basedir = os.path.abspath(os.path.dirname(__file__))
 
+# 1. CARICA VARIABILI D'AMBIENTE
+load_dotenv()
+
+# 3. CREA ISTANZA FLASK E IMPOSTA LA CONFIGURAZIONE
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'la_tua_chiave_segreta_qui' # Se non è già presente
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'trasferte.db')
+
+# 2. DETERMINA L'URI DEL DATABASE (Priorità: ENV > Fallback SQLite)
+# Legge la variabile d'ambiente DATABASE_URL
+db_url = os.environ.get("DATABASE_URL")
+
+# Fallback locale a SQLite
+if not db_url:
+    # Usa un path assoluto per SQLite se non è definito
+    db_url = 'sqlite:///' + os.path.join(basedir, 'trasferte.db') 
+
+
+
+# Configura SECRET_KEY e DATABASE_URI usando le variabili determinate
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_secret_fallback')
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url # ⬅️ USA IL VALORE DETERMINATO SOPRA!
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db.init_app(app) # Collega l'istanza 'db' importata e già usata dai modelli
+# 4. INIZIALIZZAZIONE DELLE ESTENSIONI
+db.init_app(app) # Collega l'istanza 'db' importata
 migrate = Migrate(app, db)
+login_manager = LoginManager()
+login_manager.init_app(app)
 
 def dirigente_required(f):
     """
