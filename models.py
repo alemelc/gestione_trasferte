@@ -17,7 +17,7 @@ class Dipendente(UserMixin, db.Model):
     nome = db.Column(db.String(100), nullable=False)
     cognome = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
     ruolo = db.Column(db.String(50), nullable=False, default='Dipendente') # Dipendente, Dirigente, Amministrazione
     
     # === RELAZIONE RICORSIVA (Dirigente <-> Dipendente) ===
