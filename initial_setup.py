@@ -42,7 +42,7 @@ def create_admin_user():
             cognome="System",
             email=ADMIN_EMAIL, # Usa questa email per il login!
             ruolo='Admin',
-            is_attivo=True
+            
         )
         db.session.add(admin)
         db.session.commit()
