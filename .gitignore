@@ -13,3 +13,6 @@ app.db
 
 # Ignora i file specifici di Flask/Werkzeug
 .flaskenv
+
+
+.env

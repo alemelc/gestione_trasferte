@@ -4,6 +4,7 @@
 # 1. IMPORTAZIONI DELLE LIBRERIE
 # ====================================================================
 import os
+from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -15,7 +16,19 @@ from datetime import datetime, timedelta, date, time
 from sqlalchemy.orm import joinedload # Importa joinedload
 from functools import wraps
 
-# NOTA: Qui NON importiamo Dipendente, Trasferta, ecc.
+
+# Configurazione del Database
+# Priorità: Ambiente (Render) > File .env (Locale)
+db_url = os.environ.get("DATABASE_URL")
+
+# Se DATABASE_URL non è definito (es. se sei ancora nel vecchio setup), usa SQLite di default
+if not db_url:
+    db_url = 'sqlite:///app.db'
+    
+# Assicurati di usare l'URI configurato
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url 
+# ...
+
 
 # ====================================================================
 # 2. CONFIGURAZIONE E CREAZIONE ISTANZE PRINCIPALI
