@@ -14,29 +14,29 @@ def create_admin_user():
         
         # --- BLOCCO DI ELIMINAZIONE FORZATA (TEMPORANEO!) ---
         # 1. Trova l'utente Admin esistente
-        existing_admin = Dipendente.query.filter_by(username=ADMIN_USERNAME).first()
+        existing_admin = Dipendente.query.filter_by(email=ADMIN_EMAIL).first()
         
         # 2. Se l'utente esiste, eliminalo
         if existing_admin:
-            print(f"Eliminazione forzata dell'utente '{ADMIN_USERNAME}' (ID: {existing_admin.id}) per rigenerazione password.")
+            print(f"Eliminazione forzata dell'utente '{existing_admin.email}' (ID: {existing_admin.id}) per rigenerazione password.")
             db.session.delete(existing_admin)
             db.session.commit()
             
         print("-------------------------------------------------------------------")
         
         # 3. Controlla di nuovo per assicurarti che non ci siano utenti con quel nome
-        if Dipendente.query.filter_by(username=ADMIN_USERNAME).first():
-            print(f"ERRORE GRAVE: Utente {ADMIN_USERNAME} non eliminato.")
+        if Dipendente.query.filter_by(email=ADMIN_EMAIL).first():
+            print(f"ERRORE GRAVE: Utente {ADMIN_EMAIL} non eliminato.")
             return
 
         # -------------------------------------------------------------------
 
-        print(f"Creazione utente amministratore '{ADMIN_USERNAME}' e hashing password...")
+        print(f"Creazione utente amministratore '{ADMIN_EMAIL}' e hashing password...")
         
         # Crea l'utente da zero
         hashed_password = generate_password_hash(ADMIN_PASSWORD)
         admin = Dipendente(
-            username=ADMIN_USERNAME,
+            #username=ADMIN_USERNAME,
             password_hash=hashed_password,
             nome="Admin",
             cognome="System",
