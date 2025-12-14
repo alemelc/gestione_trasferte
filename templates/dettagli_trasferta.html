@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Dettagli Missione {{ trasferta.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Dettagli Missione ID: {{ trasferta.id }}</h2>
+    <hr>
+    
+    {# Informazioni Base sulla Missione #}
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            Informazioni Generali
+        </div>
+        <div class="card-body">
+            <p><strong>Richiedente:</strong> {{ trasferta.richiedente.nome }} {{ trasferta.richiedente.cognome }}</p>
+            <p><strong>Data:</strong> {{ trasferta.giorno_missione.strftime('%d/%m/%Y') }}</p>
+            <p><strong>Destinazione:</strong> {{ trasferta.missione_presso }}</p>
+            <p><strong>Stato Post-Missione:</strong> <span class="badge bg-info">{{ trasferta.stato_post_missione }}</span></p>
+            {# Aggiungi qui altri dettagli importanti dalla rendicontazione (orari, km, ecc.) #}
+        </div>
+    </div>
+    
+    {# Dettagli Spese #}
+    {% if spese %}
+    <h3>Rendiconto Spese (Totale: € {{ "%.2f"|format(totale_rimborso) }})</h3>
+    <table class="table table-bordered table-sm">
+        <thead class="thead-light">
+            <tr>
+                <th>Tipo Spesa</th>
+                <th>Descrizione</th>
+                <th>Importo (€)</th>
+                <th>Data</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for spesa in spese %}
+            <tr>
+                <td>{{ spesa.tipo_spesa }}</td>
+                <td>{{ spesa.descrizione or 'N/A' }}</td>
+                <td>{{ "%.2f"|format(spesa.importo) }}</td>
+                <td>{{ spesa.data_spesa.strftime('%d/%m/%Y') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <th colspan="2" class="text-end">TOTALE RIMBORSO</th>
+                <th>€ {{ "%.2f"|format(totale_rimborso) }}</th>
+                <th></th>
+            </tr>
+        </tfoot>
+    </table>
+    {% else %}
+        <div class="alert alert-warning">Nessuna spesa associata a questa missione.</div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{{ url_for('dashboard_amministrazione') }}" class="btn btn-secondary">Torna alla Dashboard</a>
+    </div>
+
+</div>
+{% endblock %}

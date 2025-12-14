@@ -24,8 +24,8 @@ def upgrade():
                type_=sa.String(length=256),
                existing_nullable=False)
 
-    with op.batch_alter_table('trasferta', schema=None) as batch_op:
-        batch_op.drop_column('temp_colonna')
+    #with op.batch_alter_table('trasferta', schema=None) as batch_op:
+    #    batch_op.drop_column('temp_colonna')
 
     # ### end Alembic commands ###
 

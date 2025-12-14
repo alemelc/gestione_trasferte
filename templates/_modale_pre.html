@@ -1,0 +1,41 @@
+<form action="{{ url_for('approva_trasferta', trasferta_id=trasferta.id) }}" method="POST">
+    
+    <h4 class="mb-3">Dettagli Richiesta Preliminare</h4>
+    <hr>
+    
+    {% set req = trasferta.richiedente %}
+    {% if req %}
+        <p><strong>Richiedente:</strong> {{ req.nome | default('N/A') }} {{ req.cognome | default('N/A') }}</p>
+    {% else %}
+        <p class="text-danger"><strong>Richiedente:</strong> Dati non caricati. (ID Dipendente: {{ trasferta.id_dipendente | default('Sconosciuto') }})</p>
+    {% endif %}
+
+    {% set giorno_missione = trasferta.giorno_missione %}
+    <p><strong>Data Missione:</strong> 
+        {% if giorno_missione %}
+            {{ giorno_missione.strftime('%d/%m/%Y') }}
+        {% else %}
+            Data non specificata
+        {% endif %}
+    </p>
+    
+    <p><strong>Destinazione:</strong> {{ trasferta.missione_presso | default('N/D') }}</p>
+    <p><strong>Motivazione:</strong> {{ trasferta.motivo_missione | default('N/D') }}</p>
+
+    <h5 class="mt-4">Azione del Dirigente</h5>
+    <hr>
+    
+    <div class="mb-3">
+        <label for="commento_pre" class="form-label">Note di Approvazione/Rifiuto:</label>
+        <textarea class="form-control" id="commento_pre" name="commento" rows="3"></textarea>
+    </div>
+    
+    <div class="d-flex justify-content-between">
+        <button type="submit" name="azione" value="approva" class="btn btn-success">
+            <i class="fas fa-check"></i> Approva
+        </button>
+        <button type="submit" name="azione" value="rifiuta" class="btn btn-danger">
+            <i class="fas fa-times"></i> Rifiuta
+        </button>
+    </div>
+</form>

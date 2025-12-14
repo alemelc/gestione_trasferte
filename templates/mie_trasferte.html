@@ -34,7 +34,7 @@
             {% for trasferta in trasferte %}
             <tr>
                 <td>{{ trasferta.id }}</td>
-                {# ✅ CORREZIONE NOME + COGNOME CON SPAZIO #}
+                {# Nome e cognome del richiedente #}
                 <td>{{ trasferta.richiedente.nome }} {{ trasferta.richiedente.cognome }}</td>
                 <td>{{ trasferta.giorno_missione.strftime('%d/%m/%Y') }}</td>
                 <td>{{ trasferta.missione_presso }}</td>
@@ -66,59 +66,87 @@
                 </td>
 
                 <td>
-                    {# 1. AZIONI DIRIGENTE/DELEGATO (Se è l'approvatore diretto O è un delegato attivo) #}
-                    {% if trasferta.id_dirigente == current_user.id or current_user.id in ids_approvatori_autorizzati %}
+                    
+            {# 1. AZIONI DIRIGENTE/DELEGATO #}
+            {# Condizione principale: L'utente è il richiedente (Dirigente che viaggia) OPPURE è un approvatore autorizzato (Dirigente assegnato o Delegato). #}
+            
+            {% set is_action_needed_by_approver = is_authorized_approver(trasferta) and (trasferta.stato_pre_missione == 'In attesa' or trasferta.stato_post_missione == 'In attesa') %}
 
-                    {# PRIORITÀ 1: Se il Dirigente/Approvatore è anche il richiedente e può rendicontare #}
-                    {% if trasferta.id_dipendente == current_user.id and trasferta.stato_pre_missione == 'Approvata' and
-                    trasferta.stato_post_missione == 'N/A' %}
-                    <a href="{{ url_for('rendiconta_trasferta', trasferta_id=trasferta.id) }}"
-                        class="btn btn-primary btn-sm">Rendiconta (Tua Missione)</a>
+            {% if trasferta.id_dipendente == current_user.id or is_action_needed_by_approver %}
 
-                    {# ALTRIMENTI: Mostra le azioni di Approvazione per gli altri dipendenti #}
-                    {% else %}    
+                {# A) AZIONI PER IL RICHIEDENTE (Dipendente/Dirigente che compila/rivedrà) #}
+                {% if trasferta.id_dipendente == current_user.id %}
+                    
+                    {# PRIORITY 1: Rendicontazione #}
+                    {% if trasferta.stato_pre_missione == 'Approvata' and trasferta.stato_post_missione in ['N/A', 'Rifiutato Post'] %}
+                        <a href="{{ url_for('rendiconta_trasferta', trasferta_id=trasferta.id) }}"
+                            class="btn btn-primary btn-sm">Rendiconta</a>
 
-                            {# Azioni annidate di Approvazione PRE/POST/Stampa #}
-                            {% if trasferta.stato_pre_missione == 'In attesa' %}
-                            <button type="button" class="btn btn-warning btn-sm mb-1" data-bs-toggle="modal"
-                                    data-bs-target="#approvazioneModal" data-trasferta-id="{{ trasferta.id }}" data-fase="pre">
-                                    Dettagli & Approv. Pre
-                            </button>
-                            {% elif trasferta.stato_post_missione == 'In attesa' %}
-                            <button type="button" class="btn btn-warning btn-sm mb-1" data-bs-toggle="modal"
-                                    data-bs-target="#approvazioneModal" data-trasferta-id="{{ trasferta.id }}" data-fase="post">
-                                    Dettagli & Approv. Post
-                            </button>
-                            {% elif trasferta.stato_post_missione in ['Da rimborsare', 'Rimborso Concesso', 'Rimborso negato'] %}
-                            <a href="{{ url_for('report_trasferta', trasferta_id=trasferta.id) }}" class="btn btn-info btn-sm"
-                                    target="_blank">Stampa Report</a>
-                            {% else %}
-                            Nessuna azione di approvazione in sospeso
-                            {% endif %}
+                    {# GESTIONE SPESE #}
+                    {% elif trasferta.stato_post_missione in ['Compilata', 'Pronto per Rimborso'] %}
+                        <a href="{{ url_for('gestisci_spese', trasferta_id=trasferta.id) }}"
+                            class="btn btn-warning btn-sm mb-1">
+                            <i class="fas fa-euro-sign"></i> Gestisci Spese
+                        </a>
+                        
+                    {# Richiesta di Rimborso IN CORSO #}
+                    {% elif trasferta.stato_post_missione == 'Rimborso Richiesto' %}
+                        <span class="badge bg-info">In attesa Approv. Finanziaria</span>
 
-                        {% endif %} {# **<-- QUESTO CHIUDE IL BLOCCO PRIORITÀ 1 (IF/ELSE)** #}
-
-                    {# 2. AZIONI DIPENDENTE NORMALE (Se è il richiedente, ma NON è l'approvatore di questa missione) #}
-                    {% elif trasferta.id_dipendente == current_user.id %}
-
-                        {# Rendiconta #}
-                        {% if trasferta.stato_pre_missione == 'Approvata' and trasferta.stato_post_missione == 'N/A' %}
-                                <a href="{{ url_for('rendiconta_trasferta', trasferta_id=trasferta.id) }}"
-                                class="btn btn-primary btn-sm">Rendiconta</a>
-
-                        {# Pulsante Stampa Report per il Richiedente #}
-                        {% elif trasferta.stato_post_missione in ['Da rimborsare', 'Rimborso Concesso', 'Rimborso negato'] %}
-                                <a href="{{ url_for('report_trasferta', trasferta_id=trasferta.id) }}" class="btn btn-info btn-sm"
-                                target="_blank">Stampa Report</a>
-
-                        {% else %}
-                            Nessuna azione in sospeso
-                        {% endif %}
-
-                    {# 3. ALTRI UTENTI #}
+                    {# Pulsante Stampa Report #}
+                    {% elif trasferta.stato_post_missione in ['Rimborso Concesso', 'Rimborso Negato'] %}
+                        <a href="{{ url_for('report_trasferta', trasferta_id=trasferta.id) }}" class="btn btn-info btn-sm"
+                            target="_blank">Stampa Report</a>
+                        
                     {% else %}
                         Nessuna azione
-                    {% endif %} {# CHIUDE L'INTERO BLOCCO IF/ELIF/ELSE PRINCIPALE #}
+                    {% endif %}
+
+                {# B) AZIONI PER L'APPROVATORE AUTORIZZATO (Dirigente/Delegato che non è il richiedente) #}
+                {% elif is_action_needed_by_approver %}
+
+                    {% if trasferta.stato_pre_missione == 'In attesa' %}
+                        <button type="button" class="btn btn-warning btn-sm mb-1 open-approvazione-modal"
+                                data-id="{{ trasferta.id }}" data-fase="pre">
+                                Dettagli & Approv. Pre
+                        </button>
+
+                    {% elif trasferta.stato_post_missione == 'In attesa' %}
+                        <button type="button" class="btn btn-warning btn-sm mb-1 open-approvazione-modal"
+                                data-id="{{ trasferta.id }}" data-fase="rimborso">
+                                Dettagli & Approv. Post
+                        </button>
+                        
+                    {# APPROVAZIONE RIMBORSO FINANZIARIO - (DA INSERIRE PIÙ AVANTI) #}
+                    {% elif trasferta.stato_post_missione == 'Pronto per Rimborso' and current_user.ruolo == 'Amministrazione' %}
+                        <form method="POST" action="{{ url_for('approva_rimborso_finale', trasferta_id=trasferta.id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-success btn-sm" 
+                                    onclick="return confirm('Confermi l\'approvazione e la liquidazione del rimborso per questa missione? ATTENZIONE: Questa azione è irreversibile.');">
+                                Approva Rimborso Finale
+                            </button>
+                        </form>
+                        
+                        {# Opzionale: Aggiungere un Rifiuto Finanziario se necessario #}
+                        {# Esempio: 
+                        <button type="button" class="btn btn-danger btn-sm mb-1 open-approvazione-modal"
+                                data-id="{{ trasferta.id }}" data-fase="rifiuto_finale">
+                                Rifiuta Rimborso
+                        </button>
+                        #}
+                        
+                    {% else %}
+                        Nessuna azione di approvazione in sospeso
+                    {% endif %}
+                
+                {% endif %}
+
+            {# 2. AZIONI DIPENDENTE NORMALE (Non è l'approvatore di questa missione) #}
+            {# Il tuo vecchio blocco 2 non serve più perché è stato assorbito nel nuovo Blocco 1 (A) #}
+
+            {# 3. ALTRI UTENTI #}
+            {% else %}
+                Nessuna azione
+            {% endif %}
                 </td>
 
             </tr>
@@ -137,108 +165,136 @@
 
 </div>
 
+
+<div class="container mt-4">
+    </div>
 {# ====================================================================== #}
-{# MODALE BOOTSTRAP PER DETTAGLIO E CONFERMA APPROVAZIONE #}
+{# 1. MODALE BOOTSTRAP UNIFICATO #}
+{# Idealmente questo blocco andrebbe in un 'block modals' nel base.html, ma per consistenza lo lascio qui. #}
 {# ====================================================================== #}
-<div class="modal fade" id="approvazioneModal" tabindex="-1" aria-labelledby="approvazioneModalLabel"
-    aria-hidden="true">
+<div class="modal fade" id="approvazioneModal" tabindex="-1" aria-labelledby="approvazioneModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="approvazioneModalLabel">Conferma Dettagli Trasferta</h5>
-                {# Usa la classe corretta per chiudere, es. "btn-close" per Bootstrap 5 #}
+                <h5 class="modal-title" id="approvazioneModalLabel">Dettagli Approvazione</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <div id="dettagliTrasferta">Caricamento in corso...</div>
-            </div>
-            <div class="modal-footer" id="modalFooterAzioni">
+            <div class="modal-body" id="modale-body-content">
             </div>
         </div>
     </div>
 </div>
 
+{% endblock %}
+
+
+
+
 
 {# ====================================================================== #}
-{# SCRIPT JAVASCRIPT PER GESTIRE IL MODALE #}
+{# 2. SCRIPT JAVASCRIPT #}
+{# Assumendo che il blocco per gli script si chiami 'custom_scripts' #}
 {# ====================================================================== #}
+
 <script>
-    // Assumiamo che la variabile globale 'approvazioneModal' sia definita se si usa Bootstrap.js
-    var approvazioneModal = document.getElementById('approvazioneModal');
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.open-approvazione-modal').forEach(button => {
+        button.addEventListener('click', function() {
+            // *** AGGIUNGI QUESTO LOG DI VERIFICA ***
+            console.log(`Pulsante cliccato! ID: ${this.dataset.id}, Fase: ${this.dataset.fase}`); 
 
-    if (approvazioneModal) {
-        approvazioneModal.addEventListener('show.bs.modal', function (event) {
-            // Ottieni i dati dal bottone che ha attivato il modale
-            var button = event.relatedTarget;
-            var trasfertaId = button.getAttribute('data-trasferta-id');
-            var fase = button.getAttribute('data-fase');
+            const trasfertaId = this.dataset.id;
+            const fase = this.dataset.fase;
+            const contentDiv = document.getElementById('modale-body-content'); 
+            const modalTitle = document.getElementById('approvazioneModalLabel');
 
-            var dettagliDiv = document.getElementById('dettagliTrasferta');
-            var footerDiv = document.getElementById('modalFooterAzioni');
+            // 1. Aggiorna il titolo del modale in base alla fase
+            const title = {
+                'pre': 'Dettagli e Approvazione Pre-Missione',
+                'rendiconto': 'Dettagli e Approvazione Rendiconto (Fase Post)',
+                'rimborso': 'Approvazione Rimborso Finale'
+            }[fase];
+            modalTitle.textContent = title;
 
-            // 1. Caricamento dei dettagli della missione (contenuto del modale)
-            dettagliDiv.innerHTML = 'Caricamento in corso...';
+            contentDiv.innerHTML = '<p class="text-info">Caricamento in corso...</p>';
 
-            // Richiama la rotta del backend per ottenere il frammento HTML
-            fetch(`/get_dettagli_trasferta/${trasfertaId}`)
-                .then(response => response.text())
+            // 2. Chiama la rotta Flask
+            fetch(`/get_modale_content/${trasfertaId}/${fase}`)
+                .then(response => {
+                    if (!response.ok) {
+                        // Se la rotta Flask restituisce un errore (404, 500, ecc.)
+                        throw new Error(`Errore HTTP ${response.status}: Impossibile caricare il contenuto.`);
+                    }
+                    return response.text();
+                })
                 .then(html => {
-                    dettagliDiv.innerHTML = html;
+                    // 3. Inserisce il frammento HTML e mostra il modale
+                    contentDiv.innerHTML = html;
+
+                    // *** AGGIUNGI QUESTO LOG DI SUCCESSO E PASSAGGIO ***
+                    console.log('Contenuto caricato con successo. Tentativo di apertura modale.'); 
+
+                    var modal = new bootstrap.Modal(document.getElementById('approvazioneModal'));
+                    modal.show();
                 })
                 .catch(error => {
-                    dettagliDiv.innerHTML = 'Errore nel caricamento dei dettagli. Controlla la console del browser.';
-                    console.error('Errore Fetch Dettagli:', error);
+                    console.error('Fetch error:', error);
+                    // Il modale NON si aprirà in caso di errore della chiamata fetch
+                    contentDiv.innerHTML = `<p class="text-danger">Errore durante il caricamento: ${error.message}</p>`;
                 });
-
-
-            // 2. Aggiornamento dinamico dei pulsanti di Approva/Rifiuta nel footer
-            // ...
-            if (fase === 'pre') {
-
-                // Generiamo i form POST corretti invece dei link <a>
-                var approvaUrl = "{{ url_for('approva_trasferta', trasferta_id=0) }}".replace('0', trasfertaId);
-                var rifiutaUrl = "{{ url_for('rifiuta_trasferta', trasferta_id=0) }}".replace('0', trasfertaId);
-
-                footerDiv.innerHTML = `
-                    <form method="POST" action="${approvaUrl}" style="display: inline;">
-                        <button type="submit" class="btn btn-success">
-                            APPROVA PRE-MISSIONE
-                        </button>
-                    </form>
-                    
-                    <form method="POST" action="${rifiutaUrl}" style="display: inline;">
-                        <button type="submit" class="btn btn-danger" onclick="return confirm('Sei sicuro di voler RIFIUTARE questa missione?');">
-                            RIFIUTA PRE-MISSIONE
-                        </button>
-                    </form>
-                `;
-
-                document.getElementById('approvazioneModalLabel').textContent = 'Conferma Richiesta Missione';
-
-            } else if (fase === 'post') {
-                // Generiamo gli URL Flask (POST)
-                var approvaRimborsoUrl = "{{ url_for('approva_rimborso', trasferta_id=0) }}".replace('0', trasfertaId);
-                var rifiutaRimborsoUrl = "{{ url_for('rifiuta_rimborso', trasferta_id=0) }}".replace('0', trasfertaId);
-
-                // Inseriamo i form POST nel footer
-                footerDiv.innerHTML = `
-                    <form method="POST" action="${approvaRimborsoUrl}" style="display: inline;">
-                        <button type="submit" class="btn btn-success">
-                            APPROVA RIMBORSO (POST)
-                        </button>
-                    </form>
-                    
-                    <form method="POST" action="${rifiutaRimborsoUrl}" style="display: inline;">
-                        <button type="submit" class="btn btn-danger" onclick="return confirm('Sei sicuro di voler RIFIUTARE il rimborso?');">
-                            RIFIUTA RIMBORSO (POST)
-                        </button>
-                    </form>
-                `;
-                document.getElementById('approvazioneModalLabel').textContent = 'Conferma Rendicontazione e Rimborso';
-            }
-
         });
-    }
+    });
+}); 
 </script>
 
+    
+
+
+<!--
+{% block custom_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestore per tutti i pulsanti che aprono il modale
+    document.querySelectorAll('.open-approvazione-modal').forEach(button => {
+        button.addEventListener('click', function() {
+            const trasfertaId = this.dataset.id;
+            const fase = this.dataset.fase;
+            const contentDiv = document.getElementById('modale-body-content'); 
+            const modalTitle = document.getElementById('approvazioneModalLabel');
+            
+            // 1. Aggiorna il titolo del modale in base alla fase
+            const title = {
+                'pre': 'Dettagli e Approvazione Pre-Missione',
+                'rendiconto': 'Dettagli e Approvazione Rendiconto (Fase Post)',
+                'rimborso': 'Approvazione Rimborso Finale'
+            }[fase];
+            modalTitle.textContent = title;
+
+            contentDiv.innerHTML = '<p class="text-info">Caricamento in corso...</p>';
+            
+            // 2. Chiama la rotta Flask (es: /get_modale_content/5/rimborso)
+            fetch(`/get_modale_content/${trasfertaId}/${fase}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Errore HTTP ${response.status}: Impossibile caricare il contenuto.`);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    // 3. Inserisce il frammento HTML (il contenuto del modale)
+                    contentDiv.innerHTML = html;
+                    
+                    // 4. Mostra il modale
+                    var modal = new bootstrap.Modal(document.getElementById('approvazioneModal'));
+                    modal.show();
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    contentDiv.innerHTML = `<p class="text-danger">Errore durante il caricamento: ${error.message}</p>`;
+                });
+        });
+    });
+}); 
+</script>
 {% endblock %}
+-->

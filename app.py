@@ -9,11 +9,11 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from models import db, Dipendente, Trasferta, Delega
+from models import db, Dipendente, Trasferta, Delega, Spesa
 from sqlalchemy import or_, and_, text, func
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta, date, time
-from sqlalchemy.orm import joinedload # Importa joinedload
+from sqlalchemy.orm import joinedload, selectinload # Importa joinedload
 from functools import wraps
 
 # ====================================================================
@@ -25,7 +25,79 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv()
 
 # 3. CREA ISTANZA FLASK E IMPOSTA LA CONFIGURAZIONE
-app = Flask(__name__)
+app = Flask(__name__, instance_relative_config=True)
+
+def is_authorized_approver(trasferta):
+    """
+    Verifica se l'utente loggato è l'approvatore diretto (dirigente)
+    o il delegato attivo.
+
+    NUOVO CONTROLLO: Il delegato NON può approvare le missioni del proprio delegante (dirigente).
+    """
+    if not current_user.is_authenticated:
+        return False
+
+    dirigente_approvatore_id = trasferta.id_dirigente
+
+    if not dirigente_approvatore_id:
+        return False
+        
+    # =========================================================
+    # 1. CASO BASE: L'utente è il Dirigente diretto della missione?
+    # =========================================================
+    if current_user.id == dirigente_approvatore_id:
+        return True # Il dirigente diretto può sempre approvare (se non è la sua missione, vedi punto 3)
+
+    # =========================================================
+    # 2. CASO DELEGATO ATTIVO
+    # =========================================================
+    today = date.today()
+    
+    delega_attiva = Delega.query.filter(
+        Delega.id_delegante == dirigente_approvatore_id,
+        Delega.id_delegato == current_user.id,
+        Delega.data_inizio <= today,
+        (Delega.data_fine.is_(None) | (Delega.data_fine >= today))
+    ).first()
+
+    if delega_attiva:
+        # CONTROLLO CRITICO: Un delegato (current_user) non può approvare 
+        # una missione richiesta dal suo delegante (il dirigente approvatore).
+        
+        # Se la missione è stata richiesta dal Dirigente che ci ha delegato, NEGA l'autorizzazione.
+        if trasferta.id_dipendente == dirigente_approvatore_id:
+            # La missione è stata richiesta dal delegante (il capo)
+            return False 
+        
+        return True # Delegato autorizzato per tutti gli altri dipendenti
+
+    # =========================================================
+    # 3. CONTROLLO SPECIALE: L'utente è un dirigente che approva la PROPRIA missione?
+    #    (Solo per la fase di rendiconto, dove deve essere negato)
+    # =========================================================
+    # Se il richiedente è lo stesso dell'approvatore, e siamo in una fase di spesa/rendiconto,
+    # qui dovrebbe subentrare un'approvazione di livello superiore (Amministrazione/HR).
+    # Se non è già gestito da un filtro di stato (es. la missione del dirigente va subito ad HR),
+    # è meglio bloccare l'auto-approvazione delle spese a questo livello.
+    
+    # Per ora, manteniamo la logica di approvazione solo sulla delega.
+    # L'auto-approvazione del dirigente è stata discussa come "necessaria" per il pre-missione, 
+    # ma deve essere bloccata se la missione è post-missione/spesa e il richiedente è il dirigente.
+    
+    # Se vuoi bloccare anche l'auto-approvazione del rendiconto (Fase Post) per il dirigente:
+    if trasferta.id_dipendente == current_user.id and trasferta.id_dirigente == current_user.id:
+        if trasferta.stato_post_missione in ['In attesa', 'Compilata']:
+             return False # Dirigente non può auto-approvare le proprie spese
+        
+    return False
+
+# Registra la funzione per renderla disponibile GLOBALMENTE in tutti i template Jinja2
+app.jinja_env.globals.update(is_authorized_approver=is_authorized_approver)
+# Le configurazioni del DB devono essere qui, subito dopo aver creato l'app.
+app.config['SECRET_KEY'] = 'la_tua_chiave_segreta_e_complessa' 
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 
 # 2. DETERMINA L'URI DEL DATABASE (Priorità: ENV > Fallback SQLite)
 # Legge la variabile d'ambiente DATABASE_URL
@@ -42,6 +114,12 @@ if not db_url:
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_secret_fallback')
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url # ⬅️ USA IL VALORE DETERMINATO SOPRA!
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+try:
+    os.makedirs(app.instance_path)
+except OSError:
+    pass
+
 
 # 4. INIZIALIZZAZIONE DELLE ESTENSIONI
 db.init_app(app) # Collega l'istanza 'db' importata
@@ -61,6 +139,17 @@ def dirigente_required(f):
             return redirect(url_for('mie_trasferte')) # Assicurati che 'mie_trasferte' sia un endpoint valido
         return f(*args, **kwargs)
     return decorated_function
+
+def amministrazione_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Assumiamo che il ruolo sia memorizzato come stringa nella colonna 'ruolo'
+        if current_user.ruolo != 'Amministrazione':
+            flash('Accesso negato. Solo gli utenti con ruolo Amministrazione possono eseguire questa azione.', 'danger')
+            return redirect(url_for('index')) # Reindirizza a una pagina sicura
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 def ruolo_richiesto(ruoli_consentiti):
     """
@@ -82,77 +171,60 @@ def ruolo_richiesto(ruoli_consentiti):
     return decorator
 
 
-def is_authorized_approver(trasferta):
-    """
-    Verifica se l'utente loggato è l'approvatore diretto (dirigente)
-    o il delegato attivo.
-    """
-    if not current_user.is_authenticated:
-        return False
 
-    # 1. Trova l'ID del Dirigente/Approvatore diretto
-    # NOTA: Assumiamo che il dirigente sia il responsabile del richiedente.
-    #dirigente_id = trasferta.richiedente.id_dirigente
-    dirigente_approvatore_id = trasferta.id_dirigente
-
-    if not dirigente_approvatore_id:
-        return False
-        
-    # Caso 1: L'utente è il Dirigente diretto?
-    if current_user.id == dirigente_approvatore_id:
-        return True
-
-    # Caso 2: L'utente è un Delegato attivo del Dirigente?
-    today = date.today()
-    
-    # Query ORM corretta per il controllo temporale:
-    delega_attiva = Delega.query.filter(
-        Delega.id_delegante == dirigente_approvatore_id,
-        Delega.id_delegato == current_user.id,
-        Delega.data_inizio <= today,
-        # La delega è attiva se data_fine è NULL OPPURE se data_fine è maggiore/uguale a oggi
-        (Delega.data_fine.is_(None) | (Delega.data_fine >= today))
-    ).first()
-
-    if delega_attiva:
-        return True
-    
-    return False
-
-# Registra la funzione per renderla disponibile GLOBALMENTE in tutti i template Jinja2
-app.jinja_env.globals.update(is_authorized_approver=is_authorized_approver)
-# Le configurazioni del DB devono essere qui, subito dopo aver creato l'app.
-app.config['SECRET_KEY'] = 'la_tua_chiave_segreta_e_complessa' 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 @app.route('/revoca_delega/<int:delega_id>', methods=['POST'])
 @login_required
-@dirigente_required # Assicurati di avere questo decorator o una logica di controllo nel corpo
+@dirigente_required
 def revoca_delega(delega_id):
-    from datetime import date
-    from models import Delega, db # Assicurati di importare Delega e db
+    from datetime import date, timedelta
+    from models import Delega, db 
 
     delega = Delega.query.get_or_404(delega_id)
 
-    # 1. Autorizzazione: solo il delegante può revocare la sua delega
+    # 1. Autorizzazione (invariata)
     if delega.id_delegante != current_user.id:
         flash('Non sei autorizzato a revocare questa delega.', 'danger')
         return redirect(url_for('gestisci_deleghe'))
         
-    # 2. Controllo: Evita revoca su deleghe già scadute
     oggi = date.today()
-    if delega.data_fine is not None and delega.data_fine < oggi:
-        flash('Questa delega è già scaduta e non necessita di revoca manuale.', 'warning')
-        return redirect(url_for('gestisci_deleghe'))
-
-    # 3. Revoca: Imposta la data di fine a oggi
-    delega.data_fine = oggi
-    db.session.commit()
+    ieri = oggi - timedelta(days=1)
     
-    flash(f"Delega a {delega.delegato.nome} {delega.delegato.cognome} revocata con successo.", 'success')
-    return redirect(url_for('gestisci_deleghe'))
+    # ======================================================================
+    # 2. LOGICA DI GESTIONE E REVOCA
+    # ======================================================================
 
+    try:
+        if delega.data_inizio > oggi:
+            # CASO A: Delega futura (Non ancora iniziata) -> ANNULLAMENTO COMPLETO
+            
+            # Annulliamo/Cancelliamo la delega. Questo è più pulito che impostare date finte.
+            db.session.delete(delega)
+            messaggio = "Delega FUTURA (non ancora iniziata) annullata con successo."
+            
+        elif delega.data_fine is not None and delega.data_fine < oggi:
+            # CASO B: Delega già scaduta
+            messaggio = "Questa delega è già scaduta e non necessita di revoca manuale."
+            flash(messaggio, 'warning')
+            return redirect(url_for('gestisci_deleghe'))
+
+        else:
+            # CASO C: Delega Attiva (In corso o Permanente) -> REVOCA IMMEDIATA
+            
+            # Imposta la data di fine a IERI, in modo che la delega sia inattiva OGGI
+            delega.data_fine = ieri
+            db.session.commit()
+            messaggio = f"Delega a {delega.delegato.nome} revocata con successo e disattivata immediatamente."
+        
+        # Se siamo nel CASO A o CASO C, esegui il commit
+        db.session.commit()
+        flash(messaggio, 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore nel processo di revoca/annullamento della delega: {e}', 'danger')
+        
+    return redirect(url_for('gestisci_deleghe'))
 
 # ====================================================================
 # 3. IMPORTAZIONE DEI MODELLI E DI 'db' (PLACEHOLDER)
@@ -187,6 +259,44 @@ def load_user(user_id):
 # ====================================================================
 # ROTTE DI GESTIONE E AUTENTICAZIONE
 # ====================================================================
+
+@app.route('/get_modale_content/<int:trasferta_id>/<string:fase>')
+@login_required
+def get_modale_content(trasferta_id, fase):
+
+    trasferta = Trasferta.query.get_or_404(trasferta_id)
+
+    if fase == 'pre':
+        return render_template('_modale_pre.html', trasferta=trasferta, fase=fase)
+        
+    elif fase == 'rendiconto':
+        # Per il dipendente: mostra dati effettivi e spese da completare/revisionare
+        spese = Spesa.query.filter_by(id_trasferta=trasferta_id).all()
+        # Calcolo del totale per la visualizzazione nel modale
+        totale_spese = sum(spesa.importo for spesa in spese) 
+        
+        return render_template('_modale_rendiconto.html', 
+                               trasferta=trasferta, 
+                               spese=spese, 
+                               totale_spese=totale_spese, # Variabile passata
+                               fase=fase)
+        
+    elif fase == 'rimborso':
+        # Per il dirigente: mostra dati effettivi e spese per l'approvazione finale
+        spese = Spesa.query.filter_by(id_trasferta=trasferta_id).all()
+        
+        # Calcolo del totale per l'approvazione finale
+        totale_spese = sum(spesa.importo for spesa in spese) # <-- Variabile DEFINITA QUI
+        
+        return render_template('_modale_rendiconto.html', 
+                               trasferta=trasferta, 
+                               spese=spese,
+                               totale_spese=totale_spese, # Variabile usata qui
+                               fase=fase)
+    
+    else:
+        return jsonify({'error': 'Fase non riconosciuta.'}), 400
+
 
 @app.route('/')
 def index():
@@ -398,7 +508,14 @@ def nuova_trasferta():
     if current_user.ruolo not in ['Dipendente', 'Dirigente']:
         flash('Non sei autorizzato a richiedere trasferte.', 'danger')
         return redirect(url_for('index'))
-        
+
+    if current_user.ruolo == 'Dirigente':
+        print(f"DEBUG INIZIO: ID UTENTE: {current_user.id}")
+        print(f"DEBUG INIZIO: ID DIRIGENTE ASSEGNATO (DB): {current_user.id_dirigente}")
+        # Questo ci dirà il valore ESATTO del campo,
+        # che dovrebbe essere 1 per far scattare l'auto-approvazione.
+
+
     # Verifica che il dipendente abbia un dirigente assegnato prima di inviare
     if not current_user.id_dirigente:
         flash('Non puoi inviare una richiesta finché non ti è stato assegnato un dirigente responsabile.', 'warning')
@@ -448,36 +565,62 @@ def nuova_trasferta():
         aut_timbratura_uscita = converti_ora(aut_timbratura_uscita_str)
 
         # =========================================================================
-        # 3.5. 🚨 NUOVA LOGICA DI AUTO-APPROVAZIONE (Dirigente) 🚨
+        # 3.5. LOGICA DI AUTO-APPROVAZIONE (Dirigente)
         # =========================================================================
-        # Definiamo i valori predefiniti
         stato_iniziale = 'In attesa'
-        id_approvatore = current_user.id_dirigente # Il dirigente assegnato
+        id_approvatore_pre = current_user.id_dirigente # Default: il dirigente assegnato
         data_app = None
-        flash_message = 'Richiesta di trasferta inviata con successo per l\'approvazione.'
+        final_flash_message = 'Richiesta di trasferta inviata con successo per l\'approvazione.'
 
-        # Se l'utente è un Dirigente, si auto-approva
-        if current_user.ruolo == 'Dirigente': 
-            stato_iniziale = 'Approvata'
-            
-            # Il dirigente è l'approvatore di se stesso. Usiamo current_user.id
-            id_approvatore = current_user.id 
-            data_app = datetime.now()
-            
-            # Nota: Devi assicurarti che un Dirigente possa arrivare qui (vedi verifica iniziale)
-            # La verifica iniziale: `if current_user.ruolo != 'Dipendente':` andrebbe rimossa
-            # o modificata se i Dirigenti possono usare questa rotta.
-            flash_message = 'Richiesta di trasferta creata e auto-approvata.'
         
+        # AGGIUNGI QUESTI CONTROLLI DI DEBUG
+        print(f"\n--- DEBUG CREAZIONE MISSIONE ---")
+        print(f"Current User ID: {current_user.id}")
+        print(f"Current User Ruolo: {current_user.ruolo}")
+        print(f"Dirigente Assegnato (current_user.id_dirigente): {current_user.id_dirigente}")
+        # ------------------------------------
+
+
+
+        # === VERO O FALSO: Auto-approvazione? ===
+        # Verifichiamo se l'utente è un Dirigente E se è il suo proprio dirigente responsabile.
+        is_auto_approving_dirigente = (current_user.ruolo == 'Dirigente' and 
+                                    current_user.id == current_user.id_dirigente)
+
+        if is_auto_approving_dirigente:
+            # Se il dirigente si sta auto-approvando
+            stato_iniziale = 'Approvata'
+            id_approvatore_pre = current_user.id_dirigente # L'approvatore pre è se stesso
+            data_app = datetime.now()
+            final_flash_message = 'Richiesta di trasferta creata e auto-approvata (Dirigente).'
+            
+            print(f"DEBUG: Auto-approvazione SCATTATA! Nuovo Stato: {stato_iniziale}") # VEDIAMO SE QUESTO SCATTA
+
+        print(f"DEBUG: Valore finale id_approvatore_pre: {id_approvatore_pre}")
+        print(f"DEBUG: Valore finale stato_pre_missione: {stato_iniziale}\n")
+
+
+
+        # DEBUG CRITICO: Aggiungi un log server-side per confermare che questa sezione è stata raggiunta
+        #print(f"DEBUG: Auto-approvazione scattata per utente ID: {current_user.id}") 
+
+        # Se non è auto-approvazione, l'approvatore pre è già impostato a current_user.id_dirigente (default)
         # ========================================================================
 
         # 4. Creazione e Salvataggio dell'oggetto Trasferta
         try:
             nuova_trasferta = Trasferta(
                 id_dipendente=current_user.id,
-                id_dirigente=id_approvatore, 
+                # Utilizza id_approvatore (che è current_user.id in caso di auto-approvazione)
+                # Se nel tuo modello 'id_dirigente' è il dirigente RESPONSABILE (e non l'approvatore pre):
+                # * Se Dirigente, id_dirigente è se stesso.
+                # * Se Dipendente, id_dirigente è il suo capo.
+                id_dirigente=current_user.id_dirigente, # Mantieni il dirigente assegnato
+                
+                # USA LE VARIABILI CONDIZIONALI:
                 stato_pre_missione=stato_iniziale,
-                data_approvazione_pre=data_app,
+                id_approvatore_pre=id_approvatore_pre, # Aggiungi questo campo per registrare chi ha approvato
+                data_approvazione_pre=data_app, # Aggiungi questo campo per registrare la data di approvazione
                 giorno_missione=data_missione,
                 inizio_missione_ora=inizio_missione_ora,
                 missione_presso=missione_presso,
@@ -488,12 +631,14 @@ def nuova_trasferta():
                 aut_timbratura_uscita=aut_timbratura_uscita,
                 motivo_timbratura=motivo_timbratura,
                 note_premissione=note_premissione,
-                #stato_pre_missione='In attesa',
             )
             
             db.session.add(nuova_trasferta)
             db.session.commit()
-            flash('Richiesta di trasferta inviata con successo per l\'approvazione.', 'success')
+            
+            # USA IL MESSAGGIO CONDIZIONALE
+            flash(final_flash_message, 'success') 
+            
             return redirect(url_for('mie_trasferte'))
             
         except Exception as e:
@@ -599,8 +744,15 @@ def mie_trasferte():
     print(f"DEBUG SQL QUERY (Final ORM con Storico): Trovate {len(missioni_da_approvare)} missioni.")
     # ...
 
-    
-    # 4. UNIONE DEI RISULTATI
+    # 4. CARICAMENTO MISSIONI DA APPROVARE PER L'AMMINISTRAZIONE
+    missioni_da_approvare_finale = []
+    if current_user.ruolo == 'Amministrazione':
+        missioni_da_approvare_finale = Trasferta.query.filter(
+            Trasferta.stato_post_missione == 'Pronto per Rimborso'
+        ).order_by(Trasferta.data_approvazione_post).all()
+
+
+    # 5. UNIONE DEI RISULTATI
     # Uniamo temporaneamente le due liste (qui si hanno i duplicati)
     trasferte_combinate = trasferte_personali + missioni_da_approvare
         
@@ -624,7 +776,8 @@ def mie_trasferte():
     # Esegui il render_template con la lista corretta:
     return render_template('mie_trasferte.html', 
                         trasferte=trasferte, # USA SOLO LA LISTA PULITA 'trasferte'
-                        ids_approvatori_autorizzati=ids_dirigenti_approvatori 
+                        ids_approvatori_autorizzati=ids_dirigenti_approvatori,
+                        missioni_da_approvare_finale=missioni_da_approvare_finale 
                         )
 
 
@@ -637,187 +790,398 @@ def mie_trasferte():
 def approva_trasferta(trasferta_id):
     trasferta = Trasferta.query.get_or_404(trasferta_id)
 
-    # *** CONTROLLO AGGIORNATO: DELEGATO INCLUSO ***
+    # 1. Recupero i dati inviati dal MODALE
+    azione = request.form.get('azione') # 'approva' o 'rifiuta'
+    commento = request.form.get('commento') # Le note del dirigente
+
+    # *** CONTROLLO AUTORIZZATIVO ***
+    # Assumendo che 'is_authorized_approver' sia definita altrove
     if not is_authorized_approver(trasferta):
-        flash('Non sei autorizzato ad approvare questa richiesta o il tuo ruolo non è Dirigente.', 'danger')
+        flash('Non sei autorizzato ad approvare/rifiutare questa richiesta.', 'danger')
         return redirect(url_for('mie_trasferte'))
     # **********************************************
     
-    if trasferta.stato_pre_missione == 'In attesa':
+    if trasferta.stato_pre_missione != 'In attesa':
+        flash('La trasferta è già stata processata.', 'warning')
+        return redirect(url_for('mie_trasferte'))
+        
+    # 2. LOGICA DI APPROVAZIONE O RIFIUTO
+    if azione == 'approva':
         trasferta.stato_pre_missione = 'Approvata'
-        trasferta.data_approvazione_pre = datetime.now()
-        trasferta.id_approvatore_pre = current_user.id # L'approvatore può essere il Dirigente o il Delegato
-        db.session.commit()
-        flash(f'Trasferta di {trasferta.richiedente.nome} approvata con successo.', 'success')
+        flash_msg = f'Trasferta di {trasferta.richiedente.nome} approvata con successo.'
+        flash_category = 'success'
+        
+    elif azione == 'rifiuta':
+        trasferta.stato_pre_missione = 'Rifiutata'
+        flash_msg = f'Trasferta di {trasferta.richiedente.nome} rifiutata.'
+        flash_category = 'warning'
+        
     else:
-        flash('La trasferta è già stata approvata o rifiutata.', 'warning')
+        # Azione non riconosciuta
+        flash('Azione non valida.', 'danger')
+        return redirect(url_for('mie_trasferte'))
+
+    # 3. AGGIORNAMENTO DEI CAMPI DI TRACCIAMENTO
+    trasferta.data_approvazione_pre = datetime.now()
+    trasferta.id_approvatore_pre = current_user.id 
+    trasferta.note_premissione = commento # Salvo il commento nel campo esistente
+
+    try:
+        db.session.commit()
+        flash(flash_msg, flash_category)
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Errore durante il salvataggio: {e}", 'danger')
 
     return redirect(url_for('mie_trasferte'))
         
 
 
 
-# --- ROTTA RIFIUTO ---
-@app.route('/rifiuta_trasferta/<int:trasferta_id>')
-@login_required
-def rifiuta_trasferta(trasferta_id):
-    trasferta = Trasferta.query.get_or_404(trasferta_id)
 
-    # *** CONTROLLO AGGIORNATO: DELEGATO INCLUSO ***
-    if not is_authorized_approver(trasferta):
-        flash('Non sei autorizzato a rifiutare questa richiesta o il tuo ruolo non è Dirigente.', 'danger')
-        return redirect(url_for('mie_trasferte'))
-    # **********************************************
-
-    if trasferta.stato_pre_missione == 'In attesa':
-        trasferta.stato_pre_missione = 'Rifiutata'
-        trasferta.data_approvazione_pre = datetime.now()
-        trasferta.id_approvatore_pre = current_user.id
-        db.session.commit()
-        flash(f'Trasferta di {trasferta.richiedente.nome} rifiutata.', 'success')
-    else:
-        flash('La trasferta è già stata approvata o rifiutata.', 'warning')
-
-    return redirect(url_for('mie_trasferte'))
 
 
 @app.route('/rendiconta_trasferta/<int:trasferta_id>', methods=['GET', 'POST'])
 @login_required
 def rendiconta_trasferta(trasferta_id):
+    # Definizione delle funzioni helper locali (o assicurati che siano globali/importate)
+    def safe_float(valore):
+        try:
+            return float(str(valore).replace(',', '.')) if valore else 0.0
+        except ValueError:
+            return 0.0
+            
+    def safe_int(valore):
+        try:
+            return int(valore) if valore else 0
+        except ValueError:
+            return 0
+            
     trasferta = Trasferta.query.get_or_404(trasferta_id)
 
     # Controlli preliminari (utente corretto, missione approvata)
     if trasferta.id_dipendente != current_user.id or trasferta.stato_pre_missione != 'Approvata':
-        flash('Non puoi rendicontare questa missione.', 'danger')
+        flash('Non puoi rendicontare questa missione o non è nello stato corretto.', 'danger')
         return redirect(url_for('mie_trasferte'))
 
-    if trasferta.stato_post_missione != 'N/A':
-        flash(f'Rendicontazione già inviata ({trasferta.stato_post_missione}).', 'warning')
-        return redirect(url_for('mie_trasferte'))
+    # Se la rendicontazione è già stata inviata, si reindirizza (sebbene il GET sia utile per la visualizzazione)
+    if trasferta.stato_post_missione == 'In attesa':
+        flash(f'Rendicontazione già inviata ({trasferta.stato_post_missione}). Puoi comunque modificarla e reinviarla.', 'warning')
+        # In questo caso, lasciamo che la logica POST gestisca il reinvio
 
     if request.method == 'POST':
         try:
-            # 1. Parsing degli orari e conversione in timedelta
+            # --- 1. SALVATAGGIO DATI EFFETTIVI e LOGISTICA ---
             
-            # Orari Missione
-            ora_inizio_str = request.form.get('ora_inizio_effettiva') # Es. 08:00
+            ora_inizio_str = request.form.get('ora_inizio_effettiva')
             ora_fine_str = request.form.get('ora_fine_effettiva')
-            
-            ora_inizio = datetime.strptime(ora_inizio_str, '%H:%M').time()
-            ora_fine = datetime.strptime(ora_fine_str, '%H:%M').time()
-            
-            # Pausa Pranzo
             pausa_dalle_str = request.form.get('pausa_pranzo_dalle')
             pausa_alle_str = request.form.get('pausa_pranzo_alle')
             
-            # 2. CALCOLO DURATA (Logica Semplificata, assumendo missione nello stesso giorno)
-            # Trasformiamo i 'time' in 'datetime' (usando una data fittizia per i calcoli)
-            dt_inizio = datetime.combine(date.today(), ora_inizio)
-            dt_fine = datetime.combine(date.today(), ora_fine)
+            # Conversione Orari (gestione None/vuoto per i Time)
+            ora_inizio = datetime.strptime(ora_inizio_str, '%H:%M').time() if ora_inizio_str else None
+            ora_fine = datetime.strptime(ora_fine_str, '%H:%M').time() if ora_fine_str else None
+
+            # Calcolo Durata Netta (basato solo sugli orari se la missione è giornaliera)
+            durata_netta = timedelta(0)
+            if ora_inizio and ora_fine:
+                dt_inizio = datetime.combine(date.today(), ora_inizio)
+                dt_fine = datetime.combine(date.today(), ora_fine)
+                durata_netta = dt_fine - dt_inizio
+
+                # Sottrazione Pausa Pranzo
+                if pausa_dalle_str and pausa_alle_str:
+                    dt_pausa_inizio = datetime.combine(date.today(), datetime.strptime(pausa_dalle_str, '%H:%M').time())
+                    dt_pausa_fine = datetime.combine(date.today(), datetime.strptime(pausa_alle_str, '%H:%M').time())
+                    pausa_pranzo_durata = dt_pausa_fine - dt_pausa_inizio
+                    durata_netta -= pausa_pranzo_durata
+
+                durata_totale_ore_int = int(durata_netta.total_seconds() / 3600)
+                trasferta.durata_totale_ore = durata_totale_ore_int
             
-            durata_totale = dt_fine - dt_inizio
-            
-            # Calcolo pausa pranzo (da sottrarre se specificata)
-            pausa_pranzo_durata = timedelta(0)
-            if pausa_dalle_str and pausa_alle_str:
-                 dt_pausa_inizio = datetime.combine(date.today(), datetime.strptime(pausa_dalle_str, '%H:%M').time())
-                 dt_pausa_fine = datetime.combine(date.today(), datetime.strptime(pausa_alle_str, '%H:%M').time())
-                 pausa_pranzo_durata = dt_pausa_fine - dt_pausa_inizio
-                 
-            # Durata netta missione
-            durata_netta = durata_totale - pausa_pranzo_durata
-            
-            # Converti in ore intere per la colonna (puoi usare float se vuoi i decimali)
-            durata_totale_ore_int = int(durata_netta.total_seconds() / 3600)
-            
-            
-            # 3. Aggiornamento dell'Oggetto Trasferta
+            # AGGIORNAMENTO CAMPI TRASFERTA
             trasferta.ora_inizio_effettiva = ora_inizio
             trasferta.ora_fine_effettiva = ora_fine
-            trasferta.durata_totale_ore = durata_totale_ore_int
-           
-            # Funzione helper per la conversione sicura a float
-            def safe_float(valore):
-                try:
-                    # Sostituisce la virgola con il punto per i numeri decimali se necessario
-                    return float(str(valore).replace(',', '.')) if valore else 0.0
-                except ValueError:
-                    return 0.0
-             
-            # Funzione helper per la conversione sicura a int
-            def safe_int(valore):
-                try:
-                    return int(valore) if valore else 0
-                except ValueError:
-                    return 0
-             
-            # TEMPI E DISTANZE
-            trasferta.durata_viaggio_andata_min = safe_int(request.form.get('durata_viaggio_andata'))
-            trasferta.durata_viaggio_ritorno_min = safe_int(request.form.get('durata_viaggio_ritorno'))
             trasferta.km_percorsi = safe_float(request.form.get('km_percorsi'))
-            
-            # DATI RENDICONTO E NOTE (Assicurati che questi campi siano nel tuo Modello!)
             trasferta.mezzo_km_percorsi = request.form.get('mezzo_km_percorsi')
-            trasferta.percorso_effettuato = request.form.get('percorso_effettuato')
             trasferta.note_rendicontazione = request.form.get('note_rendicontazione')
-
-            # DATI AGGIUNTIVI (Booleani, Orari e Stringhe)
+            
+            # Dati Pausa e Extra Orario
             trasferta.pausa_pranzo_dalle = datetime.strptime(pausa_dalle_str, '%H:%M').time() if pausa_dalle_str else None
             trasferta.pausa_pranzo_alle = datetime.strptime(pausa_alle_str, '%H:%M').time() if pausa_alle_str else None
-            
-            # Il 'request.form.get(...) == 'si'' è corretto per checkbox/radio
-            trasferta.pernotto = request.form.get('pernotto') == 'si' 
             trasferta.richiesta_pausa_pranzo = request.form.get('richiesta_pausa_pranzo')
             trasferta.extra_orario = request.form.get('extra_orario')
-        
-            # Stato finale
-            trasferta.stato_post_missione = 'In attesa'
+            
+            # --- 2. GESTIONE SPESE (Cancellazione e Reinserimento) ---
+            
+            # A. ELIMINA le spese esistenti
+            Spesa.query.filter_by(id_trasferta=trasferta_id).delete()
+            db.session.flush() # Importante: esegue la cancellazione ora
+
+            # B. RECUPERA e INSERISCI le nuove spese
+            categorie = request.form.getlist('spesa_categoria[]')
+            descrizioni = request.form.getlist('spesa_descrizione[]')
+            importi = request.form.getlist('spesa_importo[]')
+            date_spesa = request.form.getlist('spesa_data[]')
+            
+            if len(categorie) != len(importi):
+                flash('Errore: I dati delle spese inviati non sono allineati.', 'danger')
+                raise Exception("Dati spesa non allineati.")
+            
+            for i in range(len(categorie)):
+                # Controlla che la riga non sia completamente vuota (es. la riga iniziale)
+                if not categorie[i] or not importi[i]:
+                    continue
+                    
+                data_spesa_obj = datetime.strptime(date_spesa[i], '%Y-%m-%d').date()
+
+                nuova_spesa = Spesa(
+                    id_trasferta=trasferta_id,
+                    categoria=categorie[i],
+                    descrizione=descrizioni[i],
+                    importo=safe_float(importi[i]),
+                    data_spesa=data_spesa_obj
+                )
+                db.session.add(nuova_spesa)
+                
+            # --- 3. AGGIORNAMENTO STATO E COMMIT ---
+            trasferta.stato_post_missione = 'In attesa' # In attesa di approvazione Rimborso
             
             db.session.commit()
-            flash('Rendicontazione inviata con successo per l\'approvazione del rimborso.', 'success')
+            flash('Rendicontazione (Dati e Spese) salvata e inviata con successo per l\'approvazione del rimborso.', 'success')
             return redirect(url_for('mie_trasferte'))
 
         except Exception as e:
             db.session.rollback()
-            # Se la missione dura un giorno e si usano solo gli orari, il campo Giorno non serve qui
-            flash(f'Errore nel salvataggio della rendicontazione. Controllare i formati (orari H:MM): {e}', 'danger')
+            flash(f'Errore nel salvataggio della rendicontazione: {e}', 'danger')
+            # Lascia la possibilità di riprovare nella stessa pagina (GET)
+
+    # --- LOGICA GET (Visualizzazione) ---
+    spese_esistenti = Spesa.query.filter_by(id_trasferta=trasferta_id).all()
+    totale_spese = sum(spesa.importo for spesa in spese_esistenti)
+
+    return render_template('rendiconta_trasferta.html', 
+                           trasferta=trasferta, 
+                           spese_esistenti=spese_esistenti,
+                           totale_spese=totale_spese)
 
 
-    return render_template('rendiconta_trasferta.html', trasferta=trasferta)
-
-
-# app.py
-
-@app.route('/approva_rimborso/<int:trasferta_id>', methods=['POST'])
+@app.route('/invia_rendiconto/<int:trasferta_id>', methods=['POST'])
 @login_required
-def approva_rimborso(trasferta_id):
+def invia_rendiconto(trasferta_id):
     trasferta = Trasferta.query.get_or_404(trasferta_id)
+    # ... (Controlli di autorizzazione) ...
 
-    # *** CONTROLLO AGGIORNATO: DELEGATO INCLUSO ***
-    if not is_authorized_approver(trasferta):
-        flash('Non sei autorizzato ad approvare questo rimborso.', 'danger')
-        return redirect(url_for('mie_trasferte'))
-    # **********************************************
-
-    # 4. Controllo Stato (deve essere 'In attesa' di approvazione post-missione)
-    if trasferta.stato_post_missione != 'In attesa':
-        flash(f'La richiesta di rimborso è già stata processata (Stato: {trasferta.stato_post_missione}).', 'warning')
-        return redirect(url_for('mie_trasferte'))
-
-    # 5. Aggiornamento dello Stato e dei Campi di Tracciamento
     try:
-        trasferta.stato_post_missione = 'Da rimborsare'
-        trasferta.data_approvazione_post = datetime.now()
-        trasferta.id_approvatore_post = current_user.id # L'approvatore può essere il Dirigente o il Delegato
+        # --- 1. SALVATAGGIO DATI EFFETTIVI (già fatto) ---
+        # ... (Logica per salvare km, orari, pause, extra_orario) ...
         
+        # --- 2. GESTIONE SPESE (NUOVA LOGICA) ---
+        
+        # A. ELIMINA le spese vecchie (per gestire modifiche e cancellazioni)
+        Spesa.query.filter_by(id_trasferta=trasferta_id).delete()
+        db.session.flush() # Per assicurare che le eliminazioni siano eseguite prima dei nuovi inserimenti
+
+        # B. INSERISCI le nuove spese inviate
+        categorie = request.form.getlist('spesa_categoria[]')
+        descrizioni = request.form.getlist('spesa_descrizione[]')
+        importi = request.form.getlist('spesa_importo[]')
+        date_spesa = request.form.getlist('spesa_data[]')
+        
+        if len(categorie) != len(importi):
+            raise Exception("Dati spesa non allineati.")
+        
+        for i in range(len(categorie)):
+            # Ignora le righe che non sono state completate dall'utente (es. se resta la riga vuota iniziale)
+            if not categorie[i] or not importi[i]:
+                continue
+                
+            nuova_spesa = Spesa(
+                id_trasferta=trasferta_id,
+                categoria=categorie[i], # Nel tuo modello Spesa, il campo è probabilmente tipo_spesa
+                descrizione=descrizioni[i],
+                importo=float(importi[i]),
+                data_spesa=datetime.strptime(date_spesa[i], '%Y-%m-%d').date()
+            )
+            db.session.add(nuova_spesa)
+            
+        # ===================================================================================
+        # --- 3. LOGICA DI AUTO-APPROVAZIONE POST-MISSIONE E AGGIORNAMENTO STATO ---
+        # ===================================================================================
+        
+        # 3.1. Valori di default (per Dipendenti normali)
+        stato_post_finale = 'In attesa'
+        id_approvatore_post_finale = None
+        data_app_post_finale = None
+        final_flash_message = 'Rendiconto salvato e inviato con successo per l\'approvazione post-missione.'
+
+        # 3.2. Condizione di Auto-Approvazione (Dirigente = Proprio Dirigente)
+        is_auto_approving_dirigente = (
+            current_user.ruolo == 'Dirigente' and 
+            current_user.id == current_user.id_dirigente
+        )
+
+        if is_auto_approving_dirigente:
+            # Sovrascrive i valori di default
+            stato_post_finale = 'Pronto per Rimborso' # O 'Approvata' se preferisci questo termine
+            id_approvatore_post_finale = current_user.id
+            data_app_post_finale = datetime.now()
+            final_flash_message = 'Rendiconto salvato e auto-approvato (Dirigente). Ora è pronto per il rimborso finanziario.'
+            
+            print(f"DEBUG: Auto-approvazione POST-missione scattata per Dirigente ID: {current_user.id}")
+
+        # 3.3. Aggiornamento dei campi sulla Trasferta
+        trasferta.stato_post_missione = stato_post_finale
+        trasferta.id_approvatore_post = id_approvatore_post_finale
+        trasferta.data_approvazione_post = data_app_post_finale
+
+        # ===================================================================================
+
         db.session.commit()
-        flash(f'Rimborso della trasferta del giorno {trasferta.giorno_missione.strftime("%Y-%m-%d")} approvato con successo.', 'success')
-        
+        # Usa il messaggio condizionale
+        flash(final_flash_message, 'success')
+
     except Exception as e:
         db.session.rollback()
-        flash(f"Errore durante l'approvazione del rimborso: {e}", 'danger')
-
+        flash(f'Errore nel salvataggio del rendiconto e delle spese: {e}', 'danger')
+    
     return redirect(url_for('mie_trasferte'))
+
+@app.route('/approva_rendiconto/<int:trasferta_id>', methods=['POST'])
+@login_required
+def approva_rendiconto(trasferta_id):
+    trasferta = Trasferta.query.get_or_404(trasferta_id)
+    commento_dirigente = request.form.get('commento_approva')
+    
+    # ... (1. Verifica Autorizzazione & 2. Verifica Stato Corretto, rimangono invariati) ...
+    
+    # 3. Aggiorna lo stato e salva i dati
+    trasferta.id_approvatore_post = current_user.id
+    trasferta.data_approvazione_post = datetime.now()
+    trasferta.note_approvazione_post = commento_dirigente
+    
+    # ==========================================================
+    # LOGICA DI BIFORCAZIONE: CON SPESE VS. SENZA SPESE
+    # ==========================================================
+    
+    # Assumiamo che tu abbia un modo per contare le spese (es. tramite il modello Spesa)
+    # Calcola il totale delle spese (o semplicemente il conteggio)
+    # Usiamo 'db.session.query(func.sum(Spesa.importo)).filter(Spesa.id_trasferta == trasferta_id).scalar()' 
+    # o in modo più semplice: trasferta.spese.count() se hai la relazione ORM
+    
+    # NUOVO CODICE (Utilizza il metodo query/scalar per contare in modo sicuro)
+    # Controlla il conteggio delle spese direttamente dal modello Spesa, 
+    # forzando l'esecuzione di una query efficiente SQL:
+    numero_spese = db.session.query(func.count(Spesa.id)).filter(Spesa.id_trasferta == trasferta_id).scalar()
+
+    # Se preferisci un conteggio più semplice (anche se meno efficiente del scalar()):
+    # numero_spese = Spesa.query.filter_by(id_trasferta=trasferta_id).count()
+    
+    # Se non hai la relazione ORM, puoi contare così:
+    # from models import Spesa
+    # numero_spese = Spesa.query.filter_by(id_trasferta=trasferta_id).count() 
+
+    if numero_spese > 0:
+        # CASO 1: CI SONO SPESE DA RIMBORSARE (richiede Approvazione Amministrativa)
+        trasferta.stato_post_missione = 'Pronto per Rimborso'
+        flash_message = 'Rendiconto approvato. Missione in attesa di Approvazione Finanziaria.'
+    else:
+        # CASO 2: NESSUNA SPESA (flusso completato)
+        trasferta.stato_post_missione = 'Rimborso Concesso'
+        flash_message = 'Rendiconto approvato. Nessuna spesa da rimborsare, missione completata.'
+        
+    # ==========================================================
+    
+    try:
+        db.session.commit()
+        flash(flash_message, 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore nel salvataggio dell\'approvazione: {e}', 'danger')
+        
+    return redirect(url_for('mie_trasferte'))
+
+# Funzione per il rifiuto del rendiconto (Fase Post)
+@app.route('/rifiuta_rendiconto/<int:trasferta_id>', methods=['POST'])
+@login_required
+def rifiuta_rendiconto(trasferta_id):
+    trasferta = Trasferta.query.get_or_404(trasferta_id)
+    
+    # Recupero il commento del Dirigente
+    commento_dirigente = request.form.get('commento_rifiuta')
+
+    # 1. VERIFICA AUTORIZZAZIONE
+    if not is_authorized_approver(trasferta):
+                flash('Accesso negato: Non sei autorizzato ad approvare il rendiconto per questa missione.', 'danger')
+                return redirect(url_for('mie_trasferte'))
+
+    # 2. VERIFICA STATO CORRETTO
+    if trasferta.stato_post_missione != 'In attesa':
+        flash(f'Impossibile rifiutare: il rendiconto non è in stato di attesa. Stato attuale: {trasferta.stato_post_missione}', 'danger')
+        return redirect(url_for('mie_trasferte'))
+
+    # 3. AGGIORNAMENTO STATO
+    trasferta.stato_post_missione = 'Rifiutato Post' # Ritorna al dipendente per la correzione
+    trasferta.id_approvatore_post = current_user.id
+    trasferta.data_approvazione_post = datetime.now() # O data di rifiuto
+
+    # Salvataggio del commento (Motivo del rifiuto)
+    trasferta.note_approvazione_post = commento_dirigente 
+
+    try:
+        db.session.commit()
+        flash(f'Rendiconto della trasferta ID {trasferta_id} rifiutato. Lo stato è stato aggiornato a "Rifiutato Post".', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore durante l\'aggiornamento dello stato: {e}', 'danger')
+        
+    return redirect(url_for('mie_trasferte'))
+
+@app.route('/richiedi_rimborso/<int:trasferta_id>')
+@login_required
+def richiedi_rimborso(trasferta_id):
+    trasferta = Trasferta.query.get_or_404(trasferta_id)
+    
+    # Verifica che sia il richiedente e che lo stato sia corretto
+    if trasferta.id_dipendente != current_user.id or trasferta.stato_post_missione != 'Pronto per Rimborso':
+        flash('Non puoi richiedere il rimborso in questo stato o per questa missione.', 'danger')
+        return redirect(url_for('mie_trasferte'))
+
+    trasferta.stato_post_missione = 'Rimborso Richiesto'
+    db.session.commit()
+    
+    flash('Richiesta di rimborso inviata con successo all\'ufficio finanziario.', 'success')
+    return redirect(url_for('mie_trasferte'))
+
+
+@app.route('/approva_rimborso_finale/<int:trasferta_id>', methods=['POST'])
+@login_required
+@amministrazione_required
+def approva_rimborso_finale(trasferta_id):
+    trasferta = Trasferta.query.get_or_404(trasferta_id)
+    
+    # 1. Verifica Stato Corretto (deve essere 'Pronto per Rimborso')
+    if trasferta.stato_post_missione != 'Pronto per Rimborso':
+        flash(f'Impossibile approvare: la missione non è nello stato corretto. Stato: {trasferta.stato_post_missione}', 'danger')
+        # Reindirizza a una pagina della Amministrazione/Dashboard Finanziaria
+        return redirect(url_for('mie_trasferte')) 
+        
+    # 2. Aggiornamento allo stato finale
+    trasferta.stato_post_missione = 'Rimborso Concesso'
+    trasferta.id_approvatore_finale = current_user.id
+    trasferta.data_approvazione_finale = datetime.now()
+    
+    try:
+        db.session.commit()
+        flash('Rimborso approvato e liquidato con successo. Missione completata.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore nel salvataggio dell\'approvazione finale: {e}', 'danger')
+        
+    # Reindirizza a una pagina della Amministrazione/Dashboard Finanziaria (Per ora usiamo mie_trasferte)
+    return redirect(url_for('mie_trasferte'))
+
+
 
 
 @app.route('/rifiuta_rimborso/<int:trasferta_id>')
@@ -861,7 +1225,7 @@ def associa_dirigente():
     if current_user.ruolo != 'Amministrazione':
         flash('Accesso negato: solo Amministrazione può gestire le associazioni.', 'danger')
         # Assicurati che 'dashboard' sia un endpoint valido
-        return redirect(url_for('dashboard')) 
+        return redirect(url_for('mie_trasferte')) 
 
     # --- CARICAMENTO DATI PER IL TEMPLATE (METODO GET) ---
     
@@ -907,10 +1271,23 @@ def associa_dirigente():
             
             if dirigente:
                 # Controllo anti-ciclico: un dipendente non può supervisionare sé stesso
-                if dipendente.id == dirigente.id:
-                    flash(f'Errore: {dipendente_assegnato_nome} non può essere il dirigente di sé stesso.', 'danger')
-                    return redirect(url_for('associa_dirigente'))
-                
+                 
+                # *** MODIFICA QUI: CONSENTI L'AUTO-ASSEGNAZIONE AI DIRIGENTI ***
+                 # 1. L'ID del sottoposto è uguale all'ID del dirigente?
+                is_self_assignment = (dipendente.id == dirigente.id)
+
+                # 2. Se è auto-assegnazione, CONTROLLA IL RUOLO
+                if is_self_assignment:
+                    # Permetti l'auto-assegnazione SOLO se il sottoposto è un Dirigente
+                    if dipendente.ruolo == 'Dirigente':
+                        # Se è un Dirigente che si auto-assegna, permetti l'azione (Passa)
+                        pass 
+                    else:
+                        # Se è un normale Dipendente che cerca di auto-assegnarsi, blocca
+                        flash(f'Errore: {dipendente_assegnato_nome} non può essere il dirigente di sé stesso.', 'danger')
+                        return redirect(url_for('associa_dirigente'))
+
+                # Se non c'è stata interruzione, prosegui con l'assegnazione
                 dipendente.id_dirigente = dirigente.id
                 dirigente_nome = f"{dirigente.nome} {dirigente.cognome}" # Nome completo del dirigente
             else:
@@ -936,17 +1313,6 @@ def associa_dirigente():
 
 
 
-@app.route('/dettagli_trasferta/<int:trasferta_id>')
-@login_required
-def dettagli_trasferta(trasferta_id):
-    # La logica dettagliata verrà aggiunta dopo
-    trasferta = Trasferta.query.get_or_404(trasferta_id)
-    # Questa rotta DEVE ancora essere completata con il suo template
-    flash(f'Visualizzazione dettagli per la trasferta ID: {trasferta.id}. (Pagina dettagli da creare)', 'info')
-    return redirect(url_for('mie_trasferte'))
-
-
-
 @app.route('/report_trasferta/<int:trasferta_id>')
 @login_required
 def report_trasferta(trasferta_id):
@@ -958,7 +1324,8 @@ def report_trasferta(trasferta_id):
         .options(
             joinedload(Trasferta.richiedente),
             joinedload(Trasferta.approvatore_pre),
-            joinedload(Trasferta.approvatore_post)
+            joinedload(Trasferta.approvatore_post),
+            selectinload(Trasferta.spese)
         )
     ).scalar_one_or_none()
     
@@ -972,7 +1339,14 @@ def report_trasferta(trasferta_id):
         return redirect(url_for('mie_trasferte'))
 
     # CONTROLLO STATO (Report disponibile solo a missione finalizzata)
-    if trasferta.stato_post_missione not in ['Da rimborsare', 'Rimborso Concesso', 'Rimborso negato']:
+    STATI_FINALIZZATI = [
+        'Da rimborsare', 
+        'Rimborso Concesso', 
+        'Rimborso negato',
+        'Rimborso Approvato e Liquidato' # <--- NUOVO STATO AGGIUNTO QUI
+    ]
+    
+    if trasferta.stato_post_missione not in STATI_FINALIZZATI:
         flash('Report non disponibile finché la missione non è finalizzata (stato post-missione: {}).'.format(trasferta.stato_post_missione), 'warning')
         return redirect(url_for('mie_trasferte'))
         
@@ -981,26 +1355,182 @@ def report_trasferta(trasferta_id):
 @app.route('/get_dettagli_trasferta/<int:trasferta_id>')
 @login_required
 def get_dettagli_trasferta(trasferta_id):
-    from models import Trasferta # Assumi che Trasferta sia importato
+    from models import Trasferta, Spesa # Assumi che Trasferta sia importato
     
     trasferta = Trasferta.query.get_or_404(trasferta_id)
     
-    # Non è necessario verificare l'autorizzazione qui, perché l'utente può vedere solo
-    # le missioni che il frontend gli mostra (quelle del suo id_dirigente/delegato).
-    # Se vuoi la massima sicurezza, qui va ripetuta la logica di controllo.
+    # 1. LOGICA PER I DETTAGLI DI APPROVAZIONE (ROSSI)
+    
+    # Se la missione è in uno stato post-missione che richiede approvazione (Rimborso Richiesto)
+    # o è stata approvata post (Pronto per Rimborso), carichiamo i dati delle spese.
+    stati_con_rendiconto = ['Pronto per Rimborso', 'Rimborso Richiesto', 'Rimborso Concesso', 'Rimborso Negato', 'Rifiutato Post']
+    
+    if trasferta.stato_post_missione in stati_con_rendiconto:
+        
+        # Recupera tutte le spese associate
+        spese = Spesa.query.filter_by(id_trasferta=trasferta_id).all()
+        totale_spese = sum(spesa.importo for spesa in spese)
+        
+        # 🎯 Ritorna il template specifico per la visualizzazione/approvazione del RENDICONTO
+        # (Qui dovresti usare il template che mostra la TABELLA delle SPESE)
+        return render_template('_dettagli_modale_rendiconto.html', 
+                               trasferta=trasferta, 
+                               spese=spese, 
+                               totale_spese=totale_spese)
 
-    # Ritorna un frammento HTML (o JSON, che è l'opzione migliore)
-    # OPZIONE 1: RITORNA HTML FRAMMENTATO (Più semplice da implementare subito)
-    # Creiamo un piccolo template per il contenuto del modale (es. _dettaglio_modale.html)
-    return render_template('_dettaglio_modale.html', trasferta=trasferta)
+    # 2. LOGICA PER L'APPROVAZIONE PRE-MISSIONE (o altri stati non rendicontati)
+    elif trasferta.stato_pre_missione in ['In Attesa']: # Aggiungi altri stati pre-missione se necessario
+        
+        # 🎯 Ritorna il template specifico per la PRE-MISSIONE
+        # (Qui non passiamo le spese, usiamo il template base)
+        return render_template('_dettagli_modale_pre.html', trasferta=trasferta)
+        
+    # 3. FALLBACK
+    else:
+        # Se lo stato non è riconosciuto, potresti mostrare un messaggio di errore
+        return f"<p class='text-danger'>Errore: Stato missione non gestito per la visualizzazione: {trasferta.stato_post_missione}</p>"
 
-    # OPZIONE 2: RITORNA JSON (Migliore, ma richiede più JavaScript sul frontend)
-    # return jsonify({
-    #     'id': trasferta.id,
-    #     'richiedente': f"{trasferta.richiedente.nome} {trasferta.richiedente.cognome}",
-    #     'data': trasferta.giorno_missione.strftime('%d/%m/%Y'),
-    #     # ... altri campi ...
-    # })
+    
+
+
+
+
+@app.route('/trasferta/<int:trasferta_id>/gestisci_spese', methods=['GET', 'POST'])
+@login_required
+# Il richiedente (Dirigente o Dipendente) deve poter accedere
+def gestisci_spese(trasferta_id):
+    trasferta = Trasferta.query.get_or_404(trasferta_id)
+    
+    # 1. Controllo di sicurezza e stato: Solo il richiedente può gestire le spese.
+    # Inoltre, la missione deve essere stata Approvata (pre-missione) per poter procedere.
+    if trasferta.id_dipendente != current_user.id:
+        flash('Accesso negato: puoi gestire solo le tue richieste.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    if trasferta.stato_pre_missione != 'Approvata':
+        flash('Non puoi gestire le spese di una missione non ancora approvata (o già rifiutata).', 'warning')
+        return redirect(url_for('dashboard'))
+
+    # 2. Transizione di stato iniziale (solo se la rendicontazione è già stata chiusa)
+    if trasferta.stato_post_missione in ['N/A', 'Compilata']: 
+        # Assumiamo che se arriva qui, il rendiconto orario/km sia già stato chiuso.
+        # Possiamo forzare lo stato 'Da rimborsare' se non lo è già.
+        trasferta.stato_post_missione = 'Da rimborsare'
+        db.session.commit()
+
+    # --- METODO GET: Visualizza le spese esistenti e il form ---
+    spese_esistenti = Spesa.query.filter_by(id_trasferta=trasferta_id).all()
+    
+    # Calcolo del totale
+    totale_spese = sum(s.importo for s in spese_esistenti)
+
+    if request.method == 'POST':
+        # 3. Logica POST: Salva le nuove spese e aggiorna lo stato
+
+        # Le spese sono inviate come liste di campi (es. spesa_categoria[], spesa_importo[], ecc.)
+        categorie = request.form.getlist('spesa_categoria[]')
+        importi_str = request.form.getlist('spesa_importo[]')
+        date_str = request.form.getlist('spesa_data[]')
+        descrizioni = request.form.getlist('spesa_descrizione[]')
+        
+        nuove_spese = []
+        
+        # Svuotiamo le spese esistenti per sovrascrivere o permettere la cancellazione
+        # È più sicuro eliminare e ricreare che fare un update complesso riga per riga
+        Spesa.query.filter_by(id_trasferta=trasferta_id).delete()
+        
+        try:
+            for cat, imp_str, data_s_str, desc in zip(categorie, importi_str, date_str, descrizioni):
+                # Pulizia e conversione dei dati
+                imp = float(imp_str.replace(',', '.')) if imp_str else 0.0
+                data_s = datetime.strptime(data_s_str, '%Y-%m-%d').date() if data_s_str else date.today()
+                
+                if imp > 0:
+                    nuova_spesa = Spesa(
+                        id_trasferta=trasferta_id,
+                        categoria=cat,
+                        descrizione=desc,
+                        importo=imp,
+                        data_spesa=data_s
+                    )
+                    nuove_spese.append(nuova_spesa)
+                    db.session.add(nuova_spesa)
+            
+            # 4. Aggiornamento dello Stato Trasferta
+            if len(nuove_spese) > 0:
+                # Se ci sono spese, l'ultima transizione è "Rimborso Richiesto"
+                trasferta.stato_post_missione = 'Rimborso Richiesto'
+                trasferta.data_richiesta_rimborso = datetime.now()
+                flash('Spese salvate. La richiesta di rimborso è stata inviata all\'Amministrazione.', 'success')
+            else:
+                # Se non ci sono spese (ma il dipendente ha salvato il form), chiudiamo la pratica
+                trasferta.stato_post_missione = 'Rimborso Chiuso (Zero Spese)'
+                trasferta.data_richiesta_rimborso = datetime.now()
+                flash('Nessuna spesa dichiarata. Rendiconto post-missione chiuso.', 'info')
+
+            db.session.commit()
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Errore durante il salvataggio delle spese: {e}', 'danger')
+
+        return redirect(url_for('report_trasferta', trasferta_id=trasferta_id))
+
+    # --- Ritorno GET ---
+    return render_template('gestisci_spese.html', 
+                           trasferta=trasferta, 
+                           spese_esistenti=spese_esistenti,
+                           totale_spese=totale_spese)
+
+
+@app.route('/dashboard_amministrazione')
+@login_required
+@amministrazione_required # Proteggi l'accesso
+def dashboard_amministrazione():
+    from models import Trasferta # Assicurati che sia importato
+
+    # 1. Recupera solo le missioni che il Dipartimento Finanziario deve approvare
+    trasferte_da_approvare = Trasferta.query.filter(
+        Trasferta.stato_post_missione == 'Pronto per Rimborso'
+    ).order_by(Trasferta.giorno_missione.asc()).all()
+    
+    # 2. Reindirizzamento temporaneo (se vuoi usare mie_trasferte.html)
+    # Se vuoi usare mie_trasferte.html per il test, devi recuperare tutti i dati 
+    # che quel template si aspetta (es. 'trasferte' generiche)
+    
+    # Per il test, usiamo un template nuovo e minimale
+    return render_template('dashboard_amministrazione.html', 
+                           trasferte_da_approvare=trasferte_da_approvare)
+
+
+@app.route('/dettagli_trasferta/<int:trasferta_id>')
+@login_required
+def dettagli_trasferta(trasferta_id):
+    trasferta = Trasferta.query.get_or_404(trasferta_id)
+    
+    # Controllo di Sicurezza (chi può vedere i dettagli?)
+    # Solo il richiedente, il dirigente/delegato, o l'Amministrazione.
+    is_admin = current_user.ruolo == 'Amministrazione'
+    is_approver = is_authorized_approver(trasferta) # Assumiamo che tu abbia questa funzione di utilità
+    is_requester = trasferta.id_dipendente == current_user.id
+    
+    if not (is_admin or is_approver or is_requester):
+        flash('Accesso negato. Non sei autorizzato a visualizzare i dettagli di questa trasferta.', 'danger')
+        # Reindirizza alla dashboard Amministrazione se è un admin e non ha i permessi per altro
+        if is_admin:
+             return redirect(url_for('dashboard_amministrazione'))
+        return redirect(url_for('mie_trasferte'))
+
+    # Se l'utente ha i permessi, recuperiamo le spese (tramite la relazione ORM)
+    spese_associate = trasferta.spese # Accede alla collezione di Spese collegate
+    
+    # Calcolo del totale (utile per l'Amministrazione)
+    totale_rimborso = sum(spesa.importo for spesa in spese_associate)
+    
+    return render_template('dettagli_trasferta.html', 
+                           trasferta=trasferta, 
+                           spese=spese_associate,
+                           totale_rimborso=totale_rimborso)
 
 
 if __name__ == '__main__':

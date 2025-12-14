@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Gestione Spese Missione #{{ trasferta.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Spese di Rimborso per Missione #{{ trasferta.id }}</h2>
+    <p class="text-muted">Inserisci le singole voci di spesa sostenute per la missione del **{{ trasferta.giorno_missione.strftime('%d/%m/%Y') }}**.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-4">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Dichiarazione Spese</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" id="spese-form" action="{{ url_for('gestisci_spese', trasferta_id=trasferta.id) }}">
+                
+                <table class="table table-bordered" id="spese-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 20%;">Data Spesa</th>
+                            <th style="width: 20%;">Categoria *</th>
+                            <th style="width: 30%;">Descrizione (Obbligatoria per "Altro")</th>
+                            <th style="width: 15%;">Importo (€) *</th>
+                            <th style="width: 15%;">Azione</th>
+                        </tr>
+                    </thead>
+                    <tbody id="spese-body">
+                        {# Inserimento dinamico delle righe qui #}
+                        
+                        {# Popola le spese esistenti se la pagina è caricata (GET) #}
+                        {% for spesa in spese_esistenti %}
+                            <tr>
+                                <td><input type="date" name="spesa_data[]" class="form-control" value="{{ spesa.data_spesa.strftime('%Y-%m-%d') }}" required></td>
+                                <td>
+                                    <select name="spesa_categoria[]" class="form-select spesa-categoria" required>
+                                        <option value="Trasporto" {% if spesa.categoria == 'Trasporto' %}selected{% endif %}>Trasporto</option>
+                                        <option value="Alloggio" {% if spesa.categoria == 'Alloggio' %}selected{% endif %}>Alloggio</option>
+                                        <option value="Vitto" {% if spesa.categoria == 'Vitto' %}selected{% endif %}>Vitto</option>
+                                        <option value="Altro" {% if spesa.categoria == 'Altro' %}selected{% endif %}>Altro (Specificare)</option>
+                                    </select>
+                                </td>
+                                <td><input type="text" name="spesa_descrizione[]" class="form-control" value="{{ spesa.descrizione or '' }}" {% if spesa.categoria == 'Altro' %}required{% endif %}></td>
+                                <td><input type="number" name="spesa_importo[]" class="form-control spesa-importo" step="0.01" min="0.01" value="{{ '%.2f'|format(spesa.importo) }}" required></td>
+                                <td><button type="button" class="btn btn-sm btn-danger remove-spesa">Rimuovi</button></td>
+                            </tr>
+                        {% endfor %}
+
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" class="text-end fw-bold">TOTALE SPESE RICHIESTE:</td>
+                            <td class="fw-bold"><span id="total-amount">{{ '%.2f'|format(totale_spese) }}</span> €</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <button type="button" id="add-spesa" class="btn btn-secondary btn-sm mb-3">Aggiungi Voce di Spesa</button>
+                <button type="submit" class="btn btn-success w-100" 
+                        onclick="return confirm('ATTENZIONE: Se confermi, il rendiconto viene salvato e inviato per l\'approvazione finale. Procedere?');">
+                    Salva e Invia Richiesta di Rimborso</button>
+
+                {% if spese_esistenti|length == 0 and trasferta.stato_post_missione != 'Rimborso Chiuso (Zero Spese)' %}
+                <hr>
+                <button type="button" id="close-zero-spese" class="btn btn-outline-info w-100 mt-2">Nessuna Spesa - Chiudi Rendiconto</button>
+                {% endif %}
+
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block custom_scripts %}
+<script>
+    // Categorie disponibili per il template
+    const categories = ['Trasporto', 'Alloggio', 'Vitto', 'Altro'];
+
+    
+    // Funzione per generare una nuova riga di spesa (restituisce un elemento DOM)
+    function createSpesaRow(initialData = {}) {
+        const today = new Date().toISOString().slice(0, 10);
+        const isAltro = initialData.categoria === 'Altro';
+        
+        // Stringa HTML contenente la riga (usata solo per creare l'oggetto DOM)
+        const rowHTML = `
+            <tr>
+                <td><input type="date" name="spesa_data[]" class="form-control" value="${initialData.data || today}" required></td>
+                <td>
+                    <select name="spesa_categoria[]" class="form-select spesa-categoria" required>
+                        ${categories.map(cat => `<option value="${cat}" ${initialData.categoria === cat ? 'selected' : ''}>${cat}${cat === 'Altro' ? ' (Specificare)' : ''}</option>`).join('')}
+                    </select>
+                </td>
+                <td><input type="text" name="spesa_descrizione[]" class="form-control" value="${initialData.descrizione || ''}" ${isAltro ? 'required' : ''}></td>
+                <td><input type="number" name="spesa_importo[]" class="form-control spesa-importo" step="0.01" min="0.01" value="${initialData.importo || ''}" required></td>
+                <td><button type="button" class="btn btn-sm btn-danger remove-spesa">Rimuovi</button></td>
+            </tr>
+        `;
+
+        // Crea un container temporaneo per convertire la stringa in un oggetto DOM
+        const tempContainer = document.createElement('tbody');
+        tempContainer.innerHTML = rowHTML.trim();
+        
+        // Restituisce il primo elemento figlio, che è il <tr>
+        return tempContainer.firstChild;
+
+    }    
+
+    // Funzione per aggiornare il totale
+    function updateTotals() {
+        let total = 0;
+        document.querySelectorAll('.spesa-importo').forEach(input => {
+            const value = parseFloat(input.value) || 0;
+            total += value;
+        });
+        document.getElementById('total-amount').textContent = total.toFixed(2);
+    }
+    
+    // Funzione per gestire la descrizione obbligatoria se categoria è 'Altro'
+    function handleOtherCategory(selectElement) {
+        const row = selectElement.closest('tr');
+        const descInput = row.querySelector('input[name="spesa_descrizione[]"]');
+        
+        if (selectElement.value === 'Altro') {
+            descInput.setAttribute('required', 'required');
+        } else {
+            descInput.removeAttribute('required');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const speseBody = document.getElementById('spese-body');
+        
+        // Se non ci sono spese esistenti, aggiungi una riga vuota
+        if (speseBody.children.length === 0) {
+            // *** MODIFICA QUI: Usa appendChild con l'oggetto DOM restituito ***
+            const initialRow = createSpesaRow();
+            speseBody.appendChild(initialRow); 
+            
+            // Applica la logica 'Altro' alla riga iniziale
+            handleOtherCategory(initialRow.querySelector('.spesa-categoria'));
+        }
+
+        // Aggiungi riga (Handler del pulsante add-spesa)
+        document.getElementById('add-spesa').addEventListener('click', function() {
+            const newRow = createSpesaRow(); // Chiama e ottieni l'oggetto DOM
+            
+            // *** MODIFICA QUI: Usa appendChild ***
+            speseBody.appendChild(newRow); 
+
+            // Applica la logica 'Altro' alla nuova riga
+            handleOtherCategory(newRow.querySelector('.spesa-categoria'));
+        });
+        
+        // Rimuovi riga, aggiorna totali e gestisci la categoria 'Altro' (event delegation)
+        speseBody.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-spesa')) {
+                e.target.closest('tr').remove();
+                updateTotals();
+            }
+        });
+        
+        speseBody.addEventListener('change', function(e) {
+             if (e.target.classList.contains('spesa-importo')) {
+                updateTotals();
+            } else if (e.target.classList.contains('spesa-categoria')) {
+                handleOtherCategory(e.target);
+            }
+        });
+        
+        speseBody.addEventListener('input', function(e) {
+            if (e.target.classList.contains('spesa-importo')) {
+                updateTotals();
+            }
+        });
+        
+        // Gestione del pulsante "Chiudi Rendiconto (Zero Spese)"
+        const closeZeroButton = document.getElementById('close-zero-spese');
+        if (closeZeroButton) {
+            closeZeroButton.addEventListener('click', function() {
+                // Svuotiamo le righe per inviare un form vuoto
+                speseBody.innerHTML = '';
+                // Inseriamo una riga fittizia con importo 0 per forzare la transizione nello script Python
+                speseBody.insertAdjacentHTML('beforeend', `
+                    <input type="hidden" name="spesa_categoria[]" value="Zero">
+                    <input type="hidden" name="spesa_importo[]" value="0">
+                    <input type="hidden" name="spesa_data[]" value="${new Date().toISOString().slice(0, 10)}">
+                    <input type="hidden" name="spesa_descrizione[]" value="Nessuna spesa">
+                `);
+                
+                // Cambiamo l'azione del pulsante principale e sottomettiamo
+                document.getElementById('spese-form').submit();
+            });
+        }
+
+        // Aggiorna i totali al caricamento della pagina e per le righe preesistenti
+        updateTotals();
+        document.querySelectorAll('.spesa-categoria').forEach(handleOtherCategory);
+    });
+</script>
+{% endblock %}

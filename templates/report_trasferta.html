@@ -37,8 +37,8 @@
                             <tr>
                                 <td><strong>Stato Pre-Missione:</strong></td>
                                 <td><span
-                                        class="badge bg-{{ 'success' if trasferta.stato_pre_missione == 'Approvata' else 'danger' if trasferta.stato_pre_missione == 'Rifiutata' else 'warning' }}">{{
-                                        trasferta.stato_pre_missione }}</span></td>
+                                        class="badge bg-{{ 'success' if trasferta.stato_post_missione in ['Da rimborsare', 'Rimborso Concesso', 'Rimborso Approvato e Liquidato'] else 'danger' if trasferta.stato_post_missione == 'Rimborso negato' else 'info' }}">{{
+                                        trasferta.stato_post_missione }}</span></td>
                             </tr>
                             <tr>
                                 <td><strong>Approvato Pre da:</strong></td>
@@ -127,10 +127,16 @@
                                         trasferta.stato_post_missione }}</span></td>
                             </tr>
                             <tr>
-                                <td><strong>Approvato Post da:</strong></td>
+                                <td><strong>Approvato da:</strong></td>
                                 <td>{{ trasferta.approvatore_post.nome }} {{ trasferta.approvatore_post.cognome }} (ID:
                                     {{ trasferta.id_approvatore_post or 'N/D' }})</td>
                             </tr>
+                           
+                            <tr>
+                                <td><strong>Data Approvazione:</strong></td>
+                                <td>{{ trasferta.data_approvazione_post.strftime('%d/%m/%Y %H:%M') }}</td>
+                            </tr>
+
                         </tbody>
                     </table>
 

@@ -105,6 +105,7 @@ class Trasferta(db.Model):
     aut_timbratura_uscita = db.Column(db.Time, nullable=True)
     motivo_timbratura = db.Column(db.Text, nullable=True)
     note_premissione = db.Column(db.Text, nullable=True)
+    spese = db.relationship('Spesa', backref='trasferta_rel', lazy=True, primaryjoin="Trasferta.id == Spesa.id_trasferta")
 
 # --- CAMPI PER LA RENDICONTAZIONE (FASE 2: POST MISSIONE) ---
     
@@ -140,6 +141,12 @@ class Trasferta(db.Model):
     stato_post_missione = db.Column(db.String(50), default='N/A', nullable=False) # In attesa, Da rimborsare, Rimborso negato
     data_approvazione_post = db.Column(db.DateTime, nullable=True)
     id_approvatore_post = db.Column(db.Integer, db.ForeignKey('dipendente.id'), nullable=True)
+    note_approvazione_post = db.Column(db.Text, nullable=True)
+    
+    # --- STATO APPROVAZIONE FINANZIARIA (Fase 3: Amministrazione) ---
+    id_approvatore_finale = db.Column(db.Integer, db.ForeignKey('dipendente.id'), nullable=True)
+    data_approvazione_finale = db.Column(db.DateTime, nullable=True)
+    
     # --------------------------------------------
     # ------------------------------------------------------------
 
@@ -175,6 +182,14 @@ class Trasferta(db.Model):
         back_populates='spese_approvate',
         foreign_keys=[id_approvatore_post]
     )
+
+
+    # Relazione con l'approvatore finale
+    approvatore_finale = db.relationship(
+        'Dipendente',
+        backref='rimborsi_approvati', # Scegli un nome, ad es. 'rimborsi_approvati'
+        foreign_keys=[id_approvatore_finale]
+    )
     
     def __repr__(self):
         return f"Trasferta(ID: {self.id}, Dipendente: {self.richiedente.nome}, Stato: {self.stato_pre_missione})"
@@ -206,5 +221,26 @@ class Delega(db.Model):
         return f"Delega(Delegante: {self.id_delegante}, Delegato: {self.id_delegato}, Attiva: {self.data_fine is None or self.data_fine >= date.today()})"
 
 
+class Spesa(db.Model):
+    __tablename__ = 'spesa'
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Chiave esterna alla trasferta
+    id_trasferta = db.Column(db.Integer, db.ForeignKey('trasferta.id'), nullable=False)
+    
+    # NUOVO CAMPO: La categoria della spesa
+    categoria = db.Column(db.String(50), nullable=False) # Es: 'Vitto', 'Alloggio', 'Trasporto', 'Altro'
+    
+    # Se la categoria è 'Altro', qui viene salvata la descrizione dettagliata
+    descrizione = db.Column(db.String(255), nullable=True) 
+    
+    importo = db.Column(db.Float, nullable=False)
+    data_spesa = db.Column(db.Date, nullable=False)
+    
+    # Relazione inversa (opzionale, ma pulisce la navigazione)
+    # trasferta = db.relationship('Trasferta', back_populates='spese')
+    
+    def __repr__(self):
+        return f"Spesa(id={self.id}, trasferta_id={self.id_trasferta}, categoria={self.categoria}, importo={self.importo})"
 
     
