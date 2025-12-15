@@ -1615,12 +1615,13 @@ def dettagli_trasferta(trasferta_id):
     trasferta = Trasferta.query.get_or_404(trasferta_id)
     
     # Controllo di Sicurezza (chi può vedere i dettagli?)
-    # Solo il richiedente, il dirigente/delegato, o l'Amministrazione.
+    # Solo il richiedente, il dirigente/delegato, l'Amministrazione O IL SUPERUSER.
     is_admin = current_user.ruolo == 'Amministrazione'
-    is_approver = is_authorized_approver(trasferta) # Assumiamo che tu abbia questa funzione di utilità
+    is_superuser = current_user.ruolo == 'Superuser'
+    is_approver = is_authorized_approver(trasferta) 
     is_requester = trasferta.id_dipendente == current_user.id
     
-    if not (is_admin or is_approver or is_requester):
+    if not (is_admin or is_superuser or is_approver or is_requester):
         flash('Accesso negato. Non sei autorizzato a visualizzare i dettagli di questa trasferta.', 'danger')
         # Reindirizza alla dashboard Amministrazione se è un admin e non ha i permessi per altro
         if is_admin:
