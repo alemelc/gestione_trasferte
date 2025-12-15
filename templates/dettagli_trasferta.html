@@ -6,7 +6,7 @@
 <div class="container mt-4">
     <h2>Dettagli Missione ID: {{ trasferta.id }}</h2>
     <hr>
-    
+
     {# Informazioni Base sulla Missione #}
     <div class="card mb-4">
         <div class="card-header bg-primary text-white">
@@ -16,11 +16,12 @@
             <p><strong>Richiedente:</strong> {{ trasferta.richiedente.nome }} {{ trasferta.richiedente.cognome }}</p>
             <p><strong>Data:</strong> {{ trasferta.giorno_missione.strftime('%d/%m/%Y') }}</p>
             <p><strong>Destinazione:</strong> {{ trasferta.missione_presso }}</p>
-            <p><strong>Stato Post-Missione:</strong> <span class="badge bg-info">{{ trasferta.stato_post_missione }}</span></p>
+            <p><strong>Stato Post-Missione:</strong> <span class="badge bg-info">{{ trasferta.stato_post_missione
+                    }}</span></p>
             {# Aggiungi qui altri dettagli importanti dalla rendicontazione (orari, km, ecc.) #}
         </div>
     </div>
-    
+
     {# Dettagli Spese #}
     {% if spese %}
     <h3>Rendiconto Spese (Totale: € {{ "%.2f"|format(totale_rimborso) }})</h3>
@@ -52,11 +53,18 @@
         </tfoot>
     </table>
     {% else %}
-        <div class="alert alert-warning">Nessuna spesa associata a questa missione.</div>
+    <div class="alert alert-warning">Nessuna spesa associata a questa missione.</div>
     {% endif %}
 
     <div class="mt-4">
+        {% if request.args.get('source') == 'superuser_list' %}
+        <a href="{{ url_for('dashboard_superuser_missioni') }}" class="btn btn-secondary">Torna allo Storico
+            Missioni</a>
+        {% elif request.args.get('source') == 'superuser' %}
+        <a href="{{ url_for('dashboard_superuser') }}" class="btn btn-secondary">Torna alla Dashboard Superuser</a>
+        {% else %}
         <a href="{{ url_for('dashboard_amministrazione') }}" class="btn btn-secondary">Torna alla Dashboard</a>
+        {% endif %}
     </div>
 
 </div>

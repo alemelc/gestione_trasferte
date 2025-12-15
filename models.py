@@ -95,6 +95,7 @@ class Trasferta(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     
     # Dati Missione
+    data_richiesta = db.Column(db.DateTime, default=datetime.now, nullable=False) # Data di creazione richiesta
     giorno_missione = db.Column(db.Date, nullable=False)
     inizio_missione_ora = db.Column(db.Time, nullable=True)
     missione_presso = db.Column(db.Text, nullable=False)
@@ -129,6 +130,40 @@ class Trasferta(db.Model):
     pausa_pranzo_dalle = db.Column(db.Time, nullable=True) 
     pausa_pranzo_alle = db.Column(db.Time, nullable=True)
     
+    # --- HELPER PER CONVERSIONE DURATA (Minuti <-> HH:MM) ---
+    def _minutes_to_time_str(self, minutes):
+        if not minutes:
+            return None
+        h = minutes // 60
+        m = minutes % 60
+        return f"{h:02d}:{m:02d}"
+
+    def _time_str_to_minutes(self, time_str):
+        if not time_str:
+            return None
+        try:
+            h, m = map(int, time_str.split(':'))
+            return h * 60 + m
+        except ValueError:
+            return 0
+
+    @property
+    def durata_viaggio_andata_str(self):
+        return self._minutes_to_time_str(self.durata_viaggio_andata_min)
+
+    @durata_viaggio_andata_str.setter
+    def durata_viaggio_andata_str(self, value):
+        self.durata_viaggio_andata_min = self._time_str_to_minutes(value)
+
+    @property
+    def durata_viaggio_ritorno_str(self):
+        return self._minutes_to_time_str(self.durata_viaggio_ritorno_min)
+
+    @durata_viaggio_ritorno_str.setter
+    def durata_viaggio_ritorno_str(self, value):
+        self.durata_viaggio_ritorno_min = self._time_str_to_minutes(value)
+    # --------------------------------------------------------
+
     # Extra Orario
     extra_orario = db.Column(db.String(50), nullable=True) # PLUS ORARIO, LAVORO STRAORDINARIO, RECUPERO TASTO 4
     

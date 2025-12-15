@@ -1,35 +1,74 @@
 <form action="{{ url_for('approva_trasferta', trasferta_id=trasferta.id) }}" method="POST">
-    
+
     <h4 class="mb-3">Dettagli Richiesta Preliminare</h4>
     <hr>
-    
-    {% set req = trasferta.richiedente %}
-    {% if req %}
-        <p><strong>Richiedente:</strong> {{ req.nome | default('N/A') }} {{ req.cognome | default('N/A') }}</p>
-    {% else %}
-        <p class="text-danger"><strong>Richiedente:</strong> Dati non caricati. (ID Dipendente: {{ trasferta.id_dipendente | default('Sconosciuto') }})</p>
-    {% endif %}
 
-    {% set giorno_missione = trasferta.giorno_missione %}
-    <p><strong>Data Missione:</strong> 
-        {% if giorno_missione %}
-            {{ giorno_missione.strftime('%d/%m/%Y') }}
-        {% else %}
-            Data non specificata
-        {% endif %}
-    </p>
-    
-    <p><strong>Destinazione:</strong> {{ trasferta.missione_presso | default('N/D') }}</p>
-    <p><strong>Motivazione:</strong> {{ trasferta.motivo_missione | default('N/D') }}</p>
+    {% set req = trasferta.richiedente %}
+
+    <table class="table table-bordered table-sm">
+        <tbody>
+            <tr>
+                <th style="width: 35%;">Richiedente</th>
+                <td>{{ req.nome | default('N/A') }} {{ req.cognome | default('N/A') }}</td>
+            </tr>
+            <tr>
+                <th>Data Missione</th>
+                <td>{{ giorno_missione.strftime('%d/%m/%Y') if giorno_missione else 'N/D' }}</td>
+            </tr>
+            <tr>
+                <th>Ora Inizio Prevista</th>
+                <td>{{ trasferta.inizio_missione_ora.strftime('%H:%M') if trasferta.inizio_missione_ora else 'N/D' }}
+                </td>
+            </tr>
+            <tr>
+                <th>Destinazione (Presso)</th>
+                <td>{{ trasferta.missione_presso | default('N/D') }}</td>
+            </tr>
+            <tr>
+                <th>Motivazione</th>
+                <td>{{ trasferta.motivo_missione | default('N/D') }}</td>
+            </tr>
+            <tr>
+                <th>Mezzo Utilizzato</th>
+                <td>{{ trasferta.utilizzo_mezzo | default('N/D') }}</td>
+            </tr>
+            <tr>
+                <th>Richiesta Extra Orario</th>
+                <td>{{ trasferta.aut_extra_orario | default('No') }}</td>
+            </tr>
+            <tr>
+                <th>Timbratura Entrata</th>
+                <td>{{ trasferta.aut_timbratura_entrata.strftime('%H:%M') if trasferta.aut_timbratura_entrata else '-'
+                    }}</td>
+            </tr>
+            <tr>
+                <th>Timbratura Uscita</th>
+                <td>{{ trasferta.aut_timbratura_uscita.strftime('%H:%M') if trasferta.aut_timbratura_uscita else '-' }}
+                </td>
+            </tr>
+            {% if trasferta.motivo_timbratura %}
+            <tr>
+                <th>Motivo Timbratura</th>
+                <td>{{ trasferta.motivo_timbratura }}</td>
+            </tr>
+            {% endif %}
+            {% if trasferta.note_premissione %}
+            <tr>
+                <th>Note Aggiuntive</th>
+                <td>{{ trasferta.note_premissione }}</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
 
     <h5 class="mt-4">Azione del Dirigente</h5>
     <hr>
-    
+
     <div class="mb-3">
         <label for="commento_pre" class="form-label">Note di Approvazione/Rifiuto:</label>
         <textarea class="form-control" id="commento_pre" name="commento" rows="3"></textarea>
     </div>
-    
+
     <div class="d-flex justify-content-between">
         <button type="submit" name="azione" value="approva" class="btn btn-success">
             <i class="fas fa-check"></i> Approva

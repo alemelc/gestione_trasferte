@@ -32,7 +32,7 @@ def create_admin_user():
             nome="Admin",
             cognome="System",
             email=ADMIN_EMAIL, # Usa questa email per il login!
-            ruolo='Admin',
+            ruolo='Amministrazione', # Ruolo corretto per l'app
             # Se hai aggiunto il campo is_attivo al modello, lascialo.
             # Altrimenti, DEVE essere rimosso (come da ultima correzione).
             # Dato che hai detto che funziona, lo lasciamo.

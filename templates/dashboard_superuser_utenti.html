@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Gestione Utenti - Superuser{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>👥 Gestione Utenti e Ruoli</h2>
+        <a href="{{ url_for('dashboard_superuser') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Torna alla Dashboard
+        </a>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-5">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Utente</th>
+                            <th>Email</th>
+                            <th>Ruolo Attuale</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in dipendenti %}
+                        <tr>
+                            <td>{{ d.id }}</td>
+                            <td>{{ d.nome }} {{ d.cognome }}</td>
+                            <td>{{ d.email }}</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ d.ruolo }}</span>
+                            </td>
+                            <td>
+                                <form method="POST" action="{{ url_for('aggiorna_ruolo', dipendente_id=d.id) }}"
+                                    class="d-flex align-items-center">
+                                    <select name="nuovo_ruolo" class="form-select form-select-sm me-2"
+                                        style="width: auto;">
+                                        <option value="Dipendente" {% if d.ruolo=='Dipendente' %}selected{% endif %}>
+                                            Dipendente</option>
+                                        <option value="Dirigente" {% if d.ruolo=='Dirigente' %}selected{% endif %}>
+                                            Dirigente</option>
+                                        <option value="Amministrazione" {% if d.ruolo=='Amministrazione' %}selected{%
+                                            endif %}>Amministrazione</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-outline-success">Aggiorna</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

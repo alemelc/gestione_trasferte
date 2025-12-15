@@ -6,7 +6,8 @@
 
     <h1>Rendicontazione Missione ID: {{ trasferta.id }}</h1>
 
-    <p class="lead">Compila i dettagli effettivi della missione del {{ trasferta.giorno_missione.strftime('%Y-%m-%d') }}.</p>
+    <p class="lead">Compila i dettagli effettivi della missione del {{ trasferta.giorno_missione.strftime('%Y-%m-%d')
+        }}.</p>
 
     <form method="POST" id="rendiconto-form" action="{{ url_for('rendiconta_trasferta', trasferta_id=trasferta.id) }}">
 
@@ -18,18 +19,21 @@
                 <div class="row mb-3">
                     <div class="col-md-3">
                         <label for="ora_inizio_effettiva" class="form-label">Inizio Missione (Ora effettiva)</label>
-                        <input type="time" class="form-control" id="ora_inizio_effettiva" name="ora_inizio_effettiva" 
-                               value="{{ trasferta.ora_inizio_effettiva.strftime('%H:%M') if trasferta.ora_inizio_effettiva else '' }}" required>
+                        <input type="time" class="form-control" id="ora_inizio_effettiva" name="ora_inizio_effettiva"
+                            value="{{ trasferta.ora_inizio_effettiva.strftime('%H:%M') if trasferta.ora_inizio_effettiva else '' }}"
+                            required>
                     </div>
                     <div class="col-md-3">
                         <label for="ora_fine_effettiva" class="form-label">Fine Missione (Ora effettiva)</label>
-                        <input type="time" class="form-control" id="ora_fine_effettiva" name="ora_fine_effettiva" 
-                               value="{{ trasferta.ora_fine_effettiva.strftime('%H:%M') if trasferta.ora_fine_effettiva else '' }}" required>
+                        <input type="time" class="form-control" id="ora_fine_effettiva" name="ora_fine_effettiva"
+                            value="{{ trasferta.ora_fine_effettiva.strftime('%H:%M') if trasferta.ora_fine_effettiva else '' }}"
+                            required>
                     </div>
                     <div class="col-md-3">
                         <label for="pernotto" class="form-label">Pernottamento</label>
                         <select class="form-select" id="pernotto" name="pernotto">
-                            <option value="no" {% if trasferta.pernotto is defined and not trasferta.pernotto %}selected{% endif %}>NO</option>
+                            <option value="no" {% if trasferta.pernotto is defined and not trasferta.pernotto
+                                %}selected{% endif %}>NO</option>
                             <option value="si" {% if trasferta.pernotto %}selected{% endif %}>SI</option>
                         </select>
                     </div>
@@ -37,19 +41,19 @@
 
                 <div class="row mb-3">
                     <div class="col-md-3">
-                        <label for="durata_viaggio_andata" class="form-label">Durata Viaggio Andata (minuti)</label>
-                        <input type="number" class="form-control" id="durata_viaggio_andata" name="durata_viaggio_andata" 
-                               value="{{ trasferta.durata_viaggio_andata_min or '' }}">
+                        <label for="durata_viaggio_andata" class="form-label">Durata Viaggio Andata</label>
+                        <input type="time" class="form-control" id="durata_viaggio_andata" name="durata_viaggio_andata"
+                            value="{{ trasferta.durata_viaggio_andata_str or '' }}">
                     </div>
                     <div class="col-md-3">
-                        <label for="durata_viaggio_ritorno" class="form-label">Durata Viaggio Ritorno (minuti)</label>
-                        <input type="number" class="form-control" id="durata_viaggio_ritorno" name="durata_viaggio_ritorno" 
-                               value="{{ trasferta.durata_viaggio_ritorno_min or '' }}">
+                        <label for="durata_viaggio_ritorno" class="form-label">Durata Viaggio Ritorno</label>
+                        <input type="time" class="form-control" id="durata_viaggio_ritorno"
+                            name="durata_viaggio_ritorno" value="{{ trasferta.durata_viaggio_ritorno_str or '' }}">
                     </div>
                 </div>
             </div>
         </div>
-        
+
         <div class="card shadow mb-4">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">Mezzi e Chilometri</h5>
@@ -59,20 +63,25 @@
                     <label for="mezzo_km_percorsi" class="form-label">Mezzo KM Percorsi</label>
                     <select class="form-select" id="mezzo_km_percorsi" name="mezzo_km_percorsi" required>
                         <option value="">Seleziona...</option>
-                        <option value="MEZZI GRATUITI" {% if trasferta.mezzo_km_percorsi == 'MEZZI GRATUITI' %}selected{% endif %}>Mezzi Gratuiti</option>
-                        <option value="FERROVIA" {% if trasferta.mezzo_km_percorsi == 'FERROVIA' %}selected{% endif %}>Ferrovia</option>
-                        <option value="MEZZI DI LINEA" {% if trasferta.mezzo_km_percorsi == 'MEZZI DI LINEA' %}selected{% endif %}>Mezzi di Linea</option>
-                        <option value="MEZZI PROPRI" {% if trasferta.mezzo_km_percorsi == 'MEZZI PROPRI' %}selected{% endif %}>Mezzi Propri</option>
+                        <option value="MEZZI GRATUITI" {% if trasferta.mezzo_km_percorsi=='MEZZI GRATUITI' %}selected{%
+                            endif %}>Mezzi Gratuiti</option>
+                        <option value="FERROVIA" {% if trasferta.mezzo_km_percorsi=='FERROVIA' %}selected{% endif %}>
+                            Ferrovia</option>
+                        <option value="MEZZI DI LINEA" {% if trasferta.mezzo_km_percorsi=='MEZZI DI LINEA' %}selected{%
+                            endif %}>Mezzi di Linea</option>
+                        <option value="MEZZI PROPRI" {% if trasferta.mezzo_km_percorsi=='MEZZI PROPRI' %}selected{%
+                            endif %}>Mezzi Propri</option>
                     </select>
                 </div>
                 <div class="mb-3">
                     <label for="km_percorsi" class="form-label">KM Percorsi</label>
-                    <input type="number" step="0.1" class="form-control" id="km_percorsi" name="km_percorsi" 
-                           value="{{ trasferta.km_percorsi or '0.0' }}">
+                    <input type="number" step="0.1" class="form-control" id="km_percorsi" name="km_percorsi"
+                        value="{{ trasferta.km_percorsi or '0.0' }}">
                 </div>
                 <div class="mb-3">
                     <label for="percorso_effettuato" class="form-label">Percorso Effettuato</label>
-                    <textarea class="form-control" id="percorso_effettuato" name="percorso_effettuato" rows="2" required>{{ trasferta.percorso_effettuato or '' }}</textarea>
+                    <textarea class="form-control" id="percorso_effettuato" name="percorso_effettuato" rows="2"
+                        required>{{ trasferta.percorso_effettuato or '' }}</textarea>
                 </div>
             </div>
         </div>
@@ -85,33 +94,43 @@
                 <div class="mb-3">
                     <label for="richiesta_pausa_pranzo" class="form-label">Richiesta Pausa Pranzo</label>
                     <select class="form-select" id="richiesta_pausa_pranzo" name="richiesta_pausa_pranzo" required>
-                        <option value="NESSUNA PAUSA PRANZO" {% if trasferta.richiesta_pausa_pranzo == 'NESSUNA PAUSA PRANZO' %}selected{% endif %}>Nessuna Pausa Pranzo</option>
-                        <option value="BUONO PASTO" {% if trasferta.richiesta_pausa_pranzo == 'BUONO PASTO' %}selected{% endif %}>Buono Pasto</option>
-                        <option value="RIMBORSO SPESE" {% if trasferta.richiesta_pausa_pranzo == 'RIMBORSO SPESE' %}selected{% endif %}>Rimborso Spese</option>
+                        <option value="NESSUNA PAUSA PRANZO" {% if
+                            trasferta.richiesta_pausa_pranzo=='NESSUNA PAUSA PRANZO' %}selected{% endif %}>Nessuna Pausa
+                            Pranzo</option>
+                        <option value="BUONO PASTO" {% if trasferta.richiesta_pausa_pranzo=='BUONO PASTO' %}selected{%
+                            endif %}>Buono Pasto</option>
+                        <option value="RIMBORSO SPESE" {% if trasferta.richiesta_pausa_pranzo=='RIMBORSO SPESE'
+                            %}selected{% endif %}>Rimborso Spese</option>
                     </select>
-                    <small class="form-text text-muted">Il Rimborso Spese è possibile solo se la durata è > 8 ore.</small>
+                    <small class="form-text text-muted">Il Rimborso Spese è possibile solo se la durata è > 8
+                        ore.</small>
                 </div>
 
                 <div class="row mb-3">
                     <div class="col-md-3">
                         <label for="pausa_pranzo_dalle" class="form-label">Pausa Pranzo Dalle Ore</label>
-                        <input type="time" class="form-control" id="pausa_pranzo_dalle" name="pausa_pranzo_dalle" 
-                               value="{{ trasferta.pausa_pranzo_dalle.strftime('%H:%M') if trasferta.pausa_pranzo_dalle else '' }}">
+                        <input type="time" class="form-control" id="pausa_pranzo_dalle" name="pausa_pranzo_dalle"
+                            value="{{ trasferta.pausa_pranzo_dalle.strftime('%H:%M') if trasferta.pausa_pranzo_dalle else '' }}">
                     </div>
                     <div class="col-md-3">
                         <label for="pausa_pranzo_alle" class="form-label">Pausa Pranzo Alle Ore</label>
-                        <input type="time" class="form-control" id="pausa_pranzo_alle" name="pausa_pranzo_alle" 
-                               value="{{ trasferta.pausa_pranzo_alle.strftime('%H:%M') if trasferta.pausa_pranzo_alle else '' }}">
+                        <input type="time" class="form-control" id="pausa_pranzo_alle" name="pausa_pranzo_alle"
+                            value="{{ trasferta.pausa_pranzo_alle.strftime('%H:%M') if trasferta.pausa_pranzo_alle else '' }}">
                     </div>
                 </div>
 
                 <div class="mb-3">
                     <label for="extra_orario" class="form-label">Gestione Ore in Esibero</label>
                     <select class="form-select" id="extra_orario" name="extra_orario" required>
-                        <option value="EXTRA ORARIO NON PRESENTE" {% if trasferta.extra_orario == 'EXTRA ORARIO NON PRESENTE' %}selected{% endif %}>Extra Orario Non Presente</option>
-                        <option value="PLUS ORARIO" {% if trasferta.extra_orario == 'PLUS ORARIO' %}selected{% endif %}>Plus Orario</option>
-                        <option value="LAVORO STRAORDINARIO" {% if trasferta.extra_orario == 'LAVORO STRAORDINARIO' %}selected{% endif %}>Lavoro Straordinario</option>
-                        <option value="RECUPERO TASTO 4" {% if trasferta.extra_orario == 'RECUPERO TASTO 4' %}selected{% endif %}>Recupero Tasto 4</option>
+                        <option value="EXTRA ORARIO NON PRESENTE" {% if
+                            trasferta.extra_orario=='EXTRA ORARIO NON PRESENTE' %}selected{% endif %}>Extra Orario Non
+                            Presente</option>
+                        <option value="PLUS ORARIO" {% if trasferta.extra_orario=='PLUS ORARIO' %}selected{% endif %}>
+                            Plus Orario</option>
+                        <option value="LAVORO STRAORDINARIO" {% if trasferta.extra_orario=='LAVORO STRAORDINARIO'
+                            %}selected{% endif %}>Lavoro Straordinario</option>
+                        <option value="RECUPERO TASTO 4" {% if trasferta.extra_orario=='RECUPERO TASTO 4' %}selected{%
+                            endif %}>Recupero Tasto 4</option>
                     </select>
                 </div>
             </div>
@@ -135,20 +154,28 @@
                     <tbody id="spese-body">
                         {# Popola le spese esistenti (spese_esistenti è passato dalla rotta GET) #}
                         {% for spesa in spese_esistenti %}
-                            <tr>
-                                <td><input type="date" name="spesa_data[]" class="form-control" value="{{ spesa.data_spesa.strftime('%Y-%m-%d') }}" required></td>
-                                <td>
-                                    <select name="spesa_categoria[]" class="form-select spesa-categoria" required>
-                                        <option value="Trasporto" {% if spesa.tipo_spesa == 'Trasporto' %}selected{% endif %}>Trasporto</option>
-                                        <option value="Alloggio" {% if spesa.tipo_spesa == 'Alloggio' %}selected{% endif %}>Alloggio</option>
-                                        <option value="Vitto" {% if spesa.tipo_spesa == 'Vitto' %}selected{% endif %}>Vitto</option>
-                                        <option value="Altro" {% if spesa.tipo_spesa == 'Altro' %}selected{% endif %}>Altro (Specificare)</option>
-                                    </select>
-                                </td>
-                                <td><input type="text" name="spesa_descrizione[]" class="form-control" value="{{ spesa.descrizione or '' }}" {% if spesa.tipo_spesa == 'Altro' %}required{% endif %}></td>
-                                <td><input type="number" name="spesa_importo[]" class="form-control spesa-importo" step="0.01" min="0.01" value="{{ '%.2f'|format(spesa.importo) }}" required></td>
-                                <td><button type="button" class="btn btn-sm btn-danger remove-spesa">Rimuovi</button></td>
-                            </tr>
+                        <tr>
+                            <td><input type="date" name="spesa_data[]" class="form-control"
+                                    value="{{ spesa.data_spesa.strftime('%Y-%m-%d') }}" required></td>
+                            <td>
+                                <select name="spesa_categoria[]" class="form-select spesa-categoria" required>
+                                    <option value="Trasporto" {% if spesa.tipo_spesa=='Trasporto' %}selected{% endif %}>
+                                        Trasporto</option>
+                                    <option value="Alloggio" {% if spesa.tipo_spesa=='Alloggio' %}selected{% endif %}>
+                                        Alloggio</option>
+                                    <option value="Vitto" {% if spesa.tipo_spesa=='Vitto' %}selected{% endif %}>Vitto
+                                    </option>
+                                    <option value="Altro" {% if spesa.tipo_spesa=='Altro' %}selected{% endif %}>Altro
+                                        (Specificare)</option>
+                                </select>
+                            </td>
+                            <td><input type="text" name="spesa_descrizione[]" class="form-control"
+                                    value="{{ spesa.descrizione or '' }}" {% if spesa.tipo_spesa=='Altro' %}required{%
+                                    endif %}></td>
+                            <td><input type="number" name="spesa_importo[]" class="form-control spesa-importo"
+                                    step="0.01" min="0.01" value="{{ '%.2f'|format(spesa.importo) }}" required></td>
+                            <td><button type="button" class="btn btn-sm btn-danger remove-spesa">Rimuovi</button></td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                     <tfoot>
@@ -160,7 +187,8 @@
                     </tfoot>
                 </table>
 
-                <button type="button" id="add-spesa" class="btn btn-secondary btn-sm mb-3">Aggiungi Voce di Spesa</button>
+                <button type="button" id="add-spesa" class="btn btn-secondary btn-sm mb-3">Aggiungi Voce di
+                    Spesa</button>
             </div>
         </div>
 
@@ -178,8 +206,8 @@
         </div>
 
         <button type="submit" class="btn btn-success btn-lg w-100 mb-5"
-                onclick="return confirm('Salvare il rendiconto e inviarlo per l\'approvazione finale?');">
-            Salva e Invia Richiesta di Rimborso
+            onclick="return confirm('Salvare il rendiconto e inviarlo per l\'approvazione finale?');">
+            Salva e invia richiesta di rendicontazione
         </button>
         <a href="{{ url_for('mie_trasferte') }}" class="btn btn-secondary mb-5">Annulla e Torna Indietro</a>
     </form>
@@ -196,7 +224,7 @@
     function createSpesaRow(initialData = {}) {
         const today = new Date().toISOString().slice(0, 10);
         const isAltro = initialData.categoria === 'Altro';
-        
+
         // La variabile `categories` deve essere definita qui o globalmente
         const rowHTML = `
             <tr>
@@ -215,33 +243,33 @@
         const tempContainer = document.createElement('tbody');
         tempContainer.innerHTML = rowHTML.trim();
         return tempContainer.firstChild;
-    }    
+    }
 
     // Funzione per aggiornare il totale
     function updateTotals() {
-    let total = 0;
-    document.querySelectorAll('.spesa-importo').forEach(input => {
-        let valueString = input.value;
-        
-        // 1. Sostituisce la virgola con il punto per standardizzare (se presente)
-        valueString = valueString.replace(',', '.'); 
-        
-        // 2. Tenta la conversione a float
-        const value = parseFloat(valueString) || 0;
-        
-        total += value;
-    });
-    
-    // 3. Formatta il totale a due decimali
-    document.getElementById('total-amount').textContent = total.toFixed(2);
-}
-    
+        let total = 0;
+        document.querySelectorAll('.spesa-importo').forEach(input => {
+            let valueString = input.value;
+
+            // 1. Sostituisce la virgola con il punto per standardizzare (se presente)
+            valueString = valueString.replace(',', '.');
+
+            // 2. Tenta la conversione a float
+            const value = parseFloat(valueString) || 0;
+
+            total += value;
+        });
+
+        // 3. Formatta il totale a due decimali
+        document.getElementById('total-amount').textContent = total.toFixed(2);
+    }
+
     // Funzione per gestire la descrizione obbligatoria se categoria è 'Altro'
     function handleOtherCategory(selectElement) {
         const row = selectElement.closest('tr');
         // Usiamo querySelector sulla riga per trovare l'input della descrizione specifico
-        const descInput = row.querySelector('input[name="spesa_descrizione[]"]'); 
-        
+        const descInput = row.querySelector('input[name="spesa_descrizione[]"]');
+
         if (selectElement.value === 'Altro') {
             descInput.setAttribute('required', 'required');
             descInput.focus();
@@ -250,45 +278,39 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const speseBody = document.getElementById('spese-body');
-        
-        // Se non ci sono spese esistenti (GET iniziale e lista vuota), aggiungi una riga vuota
-        if (speseBody.children.length === 0) {
-            const initialRow = createSpesaRow();
-            speseBody.appendChild(initialRow); 
-            handleOtherCategory(initialRow.querySelector('.spesa-categoria'));
-        }
+
 
         // Handler Aggiungi riga
-        document.getElementById('add-spesa').addEventListener('click', function() {
+        document.getElementById('add-spesa').addEventListener('click', function () {
             const newRow = createSpesaRow();
-            speseBody.appendChild(newRow); 
+            speseBody.appendChild(newRow);
             handleOtherCategory(newRow.querySelector('.spesa-categoria'));
         });
-        
+
         // Rimuovi riga, aggiorna totali e gestisci 'Altro' (event delegation sul tbody)
-        speseBody.addEventListener('click', function(e) {
+        speseBody.addEventListener('click', function (e) {
             if (e.target.classList.contains('remove-spesa')) {
                 e.target.closest('tr').remove();
                 updateTotals();
             }
         });
-        
-        speseBody.addEventListener('change', function(e) {
-             if (e.target.classList.contains('spesa-importo')) {
+
+        speseBody.addEventListener('change', function (e) {
+            if (e.target.classList.contains('spesa-importo')) {
                 updateTotals();
             } else if (e.target.classList.contains('spesa-categoria')) {
                 handleOtherCategory(e.target);
             }
         });
-        
-        speseBody.addEventListener('input', function(e) {
+
+        speseBody.addEventListener('input', function (e) {
             if (e.target.classList.contains('spesa-importo')) {
                 updateTotals();
             }
         });
-        
+
         // Aggiorna i totali e la logica 'Altro' per le righe esistenti al caricamento
         updateTotals();
         document.querySelectorAll('.spesa-categoria').forEach(handleOtherCategory);

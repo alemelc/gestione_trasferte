@@ -1,18 +1,29 @@
-# Ignora i file di Python
+# Python
 __pycache__/
 *.pyc
 
-# Ignora la cartella dell'ambiente virtuale
+# Virtual environment
 venv/
 .venv/
 
-# Ignora i database locali e i file di sessione
-app.db
-*.sqlite
+# Flask
+.env
+.flaskenv
 /instance/
 
-# Ignora i file specifici di Flask/Werkzeug
-.flaskenv
+# Database locali
+app.db
+*.sqlite
+
+# Alembic
+migrations/versions/__pycache__/
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
 
 
-.env

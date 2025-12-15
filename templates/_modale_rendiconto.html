@@ -9,7 +9,7 @@
 {# Dati Richiedente e Stato #}
 {% set req = trasferta.richiedente %}
 {% if req %}
-    <p><strong>Richiedente:</strong> {{ req.nome | default('N/A') }} {{ req.cognome | default('N/A') }}</p>
+<p><strong>Richiedente:</strong> {{ req.nome | default('N/A') }} {{ req.cognome | default('N/A') }}</p>
 {% endif %}
 
 <p class="mb-4">
@@ -23,54 +23,64 @@
     <div class="row mb-3">
         <div class="col-md-6">
             <label for="ora_inizio_effettiva" class="form-label">Inizio Effettivo:</label>
-            <input type="time" class="form-control" id="ora_inizio_effettiva" name="ora_inizio_effettiva" 
-                   value="{{ trasferta.ora_inizio_effettiva.strftime('%H:%M') if trasferta.ora_inizio_effettiva else '' }}" {{ disabled_attr }}>
+            <input type="time" class="form-control" id="ora_inizio_effettiva" name="ora_inizio_effettiva"
+                value="{{ trasferta.ora_inizio_effettiva.strftime('%H:%M') if trasferta.ora_inizio_effettiva else '' }}"
+                {{ disabled_attr }}>
         </div>
         <div class="col-md-6">
             <label for="ora_fine_effettiva" class="form-label">Fine Effettiva:</label>
-            <input type="time" class="form-control" id="ora_fine_effettiva" name="ora_fine_effettiva" 
-                   value="{{ trasferta.ora_fine_effettiva.strftime('%H:%M') if trasferta.ora_fine_effettiva else '' }}" {{ disabled_attr }}>
+            <input type="time" class="form-control" id="ora_fine_effettiva" name="ora_fine_effettiva"
+                value="{{ trasferta.ora_fine_effettiva.strftime('%H:%M') if trasferta.ora_fine_effettiva else '' }}" {{
+                disabled_attr }}>
         </div>
     </div>
-    
+
     <div class="row mb-3">
         <div class="col-md-6">
             <label for="km_percorsi" class="form-label">KM Percorsi:</label>
-            <input type="number" step="0.1" class="form-control" id="km_percorsi" name="km_percorsi" 
-                   value="{{ trasferta.km_percorsi or '0' }}" {{ disabled_attr }}>
+            <input type="number" step="0.1" class="form-control" id="km_percorsi" name="km_percorsi"
+                value="{{ trasferta.km_percorsi or '0' }}" {{ disabled_attr }}>
         </div>
         <div class="col-md-6">
             <label for="mezzo_km_percorsi" class="form-label">Mezzo Utilizzato (per KM):</label>
             <select class="form-select" id="mezzo_km_percorsi" name="mezzo_km_percorsi" {{ disabled_attr }}>
                 <option value="">Seleziona...</option>
-                <option value="Mezzo Proprio" {% if trasferta.mezzo_km_percorsi == 'Mezzo Proprio' %}selected{% endif %}>Mezzo Proprio</option>
-                <option value="Mezzo Aziendale" {% if trasferta.mezzo_km_percorsi == 'Mezzo Aziendale' %}selected{% endif %}>Mezzo Aziendale</option>
-                <option value="Mezzi Pubblici" {% if trasferta.mezzo_km_percorsi == 'Mezzi Pubblici' %}selected{% endif %}>Mezzi Pubblici</option>
+                <option value="Mezzo Proprio" {% if trasferta.mezzo_km_percorsi=='Mezzo Proprio' %}selected{% endif %}>
+                    Mezzo Proprio</option>
+                <option value="Mezzo Aziendale" {% if trasferta.mezzo_km_percorsi=='Mezzo Aziendale' %}selected{% endif
+                    %}>Mezzo Aziendale</option>
+                <option value="Mezzi Pubblici" {% if trasferta.mezzo_km_percorsi=='Mezzi Pubblici' %}selected{% endif
+                    %}>Mezzi Pubblici</option>
             </select>
         </div>
     </div>
 
     <hr>
     <h5>Pausa, Pasto e Extra Orario</h5>
-    
+
     <div class="row mb-3">
         <div class="col-md-4">
             <label for="richiesta_pausa_pranzo" class="form-label">Pausa/Pasto:</label>
             <select class="form-select" id="richiesta_pausa_pranzo" name="richiesta_pausa_pranzo" {{ disabled_attr }}>
-                <option value="NESSUNA" {% if trasferta.richiesta_pausa_pranzo == 'NESSUNA' %}selected{% endif %}>NESSUNA</option>
-                <option value="BUONO PASTO" {% if trasferta.richiesta_pausa_pranzo == 'BUONO PASTO' %}selected{% endif %}>BUONO PASTO</option>
-                <option value="RIMBORSO SPESE" {% if trasferta.richiesta_pausa_pranzo == 'RIMBORSO SPESE' %}selected{% endif %}>RIMBORSO SPESE</option>
+                <option value="NESSUNA" {% if trasferta.richiesta_pausa_pranzo=='NESSUNA' %}selected{% endif %}>NESSUNA
+                </option>
+                <option value="BUONO PASTO" {% if trasferta.richiesta_pausa_pranzo=='BUONO PASTO' %}selected{% endif %}>
+                    BUONO PASTO</option>
+                <option value="RIMBORSO SPESE" {% if trasferta.richiesta_pausa_pranzo=='RIMBORSO SPESE' %}selected{%
+                    endif %}>RIMBORSO SPESE</option>
             </select>
         </div>
         <div class="col-md-4">
             <label for="pausa_pranzo_dalle" class="form-label">Pausa dalle:</label>
             <input type="time" class="form-control" id="pausa_pranzo_dalle" name="pausa_pranzo_dalle"
-                   value="{{ trasferta.pausa_pranzo_dalle.strftime('%H:%M') if trasferta.pausa_pranzo_dalle else '' }}" {{ disabled_attr }}>
+                value="{{ trasferta.pausa_pranzo_dalle.strftime('%H:%M') if trasferta.pausa_pranzo_dalle else '' }}" {{
+                disabled_attr }}>
         </div>
         <div class="col-md-4">
             <label for="pausa_pranzo_alle" class="form-label">Pausa alle:</label>
             <input type="time" class="form-control" id="pausa_pranzo_alle" name="pausa_pranzo_alle"
-                   value="{{ trasferta.pausa_pranzo_alle.strftime('%H:%M') if trasferta.pausa_pranzo_alle else '' }}" {{ disabled_attr }}>
+                value="{{ trasferta.pausa_pranzo_alle.strftime('%H:%M') if trasferta.pausa_pranzo_alle else '' }}" {{
+                disabled_attr }}>
         </div>
     </div>
 
@@ -78,16 +88,20 @@
         <label for="extra_orario" class="form-label">Extra Orario:</label>
         <select class="form-select" id="extra_orario" name="extra_orario" {{ disabled_attr }}>
             <option value="">Nessun Extra Orario</option>
-            <option value="PLUS ORARIO" {% if trasferta.extra_orario == 'PLUS ORARIO' %}selected{% endif %}>PLUS ORARIO</option>
-            <option value="LAVORO STRAORDINARIO" {% if trasferta.extra_orario == 'LAVORO STRAORDINARIO' %}selected{% endif %}>LAVORO STRAORDINARIO</option>
-            <option value="RECUPERO TASTO 4" {% if trasferta.extra_orario == 'RECUPERO TASTO 4' %}selected{% endif %}>RECUPERO TASTO 4</option>
+            <option value="PLUS ORARIO" {% if trasferta.extra_orario=='PLUS ORARIO' %}selected{% endif %}>PLUS ORARIO
+            </option>
+            <option value="LAVORO STRAORDINARIO" {% if trasferta.extra_orario=='LAVORO STRAORDINARIO' %}selected{% endif
+                %}>LAVORO STRAORDINARIO</option>
+            <option value="RECUPERO TASTO 4" {% if trasferta.extra_orario=='RECUPERO TASTO 4' %}selected{% endif %}>
+                RECUPERO TASTO 4</option>
         </select>
     </div>
     <div class="mb-4">
         <label for="note_rendicontazione" class="form-label">Note sul Rendiconto:</label>
-        <textarea class="form-control" id="note_rendicontazione" name="note_rendicontazione" rows="2" {{ readonly_attr }}>{{ trasferta.note_rendicontazione or '' }}</textarea>
+        <textarea class="form-control" id="note_rendicontazione" name="note_rendicontazione" rows="2" {{ readonly_attr
+            }}>{{ trasferta.note_rendicontazione or '' }}</textarea>
     </div>
-    
+
 </div>
 
 <hr>
@@ -95,22 +109,26 @@
 <h5>Spese Registrate</h5>
 
 {% if spese %}
-    <table class="table table-sm table-striped">
-        <thead>
-            <tr><th>Categoria</th><th>Descrizione</th><th>Importo (€)</th></tr>
-        </thead>
-        <tbody>
+<table class="table table-sm table-striped">
+    <thead>
+        <tr>
+            <th>Categoria</th>
+            <th>Descrizione</th>
+            <th>Importo (€)</th>
+        </tr>
+    </thead>
+    <tbody>
         {% for spesa in spese %}
-            <tr>
-                <td>{{ spesa.categoria }}</td>
-                <td>{{ spesa.descrizione }}</td>
-                <td>{{ "%.2f" | format(spesa.importo) }}</td>
-            </tr>
+        <tr>
+            <td>{{ spesa.categoria }}</td>
+            <td>{{ spesa.descrizione }}</td>
+            <td>{{ "%.2f" | format(spesa.importo) }}</td>
+        </tr>
         {% endfor %}
-        </tbody>
-    </table>
+    </tbody>
+</table>
 {% else %}
-    <p class="text-muted">Nessuna spesa registrata.</p>
+<p class="text-muted">Nessuna spesa registrata.</p>
 {% endif %}
 
 <div class="alert alert-info d-flex justify-content-between">
@@ -121,50 +139,49 @@
 <hr>
 
 {% if fase == 'rimborso' %}
-    
-    <h5>Decisione sul Rimborso</h5>
 
-    <div class="mb-3">
-        <label for="commento_dirigente" class="form-label">Note del Dirigente (Obbligatorie in caso di rifiuto):</label>
-        <textarea class="form-control" id="commento_dirigente" name="commento_dirigente" rows="2"></textarea>
-    </div>
+<h5>Decisione sul Rendiconto</h5>
 
-    <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
-        
-        <form action="{{ url_for('approva_rendiconto', trasferta_id=trasferta.id) }}" method="POST">
-            {# Passiamo il commento come campo nascosto #}
-            <input type="hidden" name="commento_approva" id="commento_approva" value="">
-            <button type="submit" class="btn btn-success me-md-2" 
-                    onclick="document.getElementById('commento_approva').value = document.getElementById('commento_dirigente').value;">
-                <i class="fas fa-check-circle"></i> Approva Rimborso
-            </button>
-        </form>
-        
-        <form action="{{ url_for('rifiuta_rendiconto', trasferta_id=trasferta.id) }}" method="POST">
-            {# Passiamo il commento come campo nascosto #}
-            <input type="hidden" name="commento_rifiuta" id="commento_rifiuta" value="">
-            <button type="submit" class="btn btn-danger" 
-                    onclick="document.getElementById('commento_rifiuta').value = document.getElementById('commento_dirigente').value;">
-                <i class="fas fa-times-circle"></i> Rifiuta Rendiconto
-            </button>
-        </form>
-        
-    </div>
+<div class="mb-3">
+    <label for="commento_dirigente" class="form-label">Note del Dirigente (Obbligatorie in caso di rifiuto):</label>
+    <textarea class="form-control" id="commento_dirigente" name="commento_dirigente" rows="2"></textarea>
+</div>
+
+<div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
+
+    <form action="{{ url_for('approva_rendiconto', trasferta_id=trasferta.id) }}" method="POST">
+        {# Passiamo il commento come campo nascosto #}
+        <input type="hidden" name="commento_approva" id="commento_approva" value="">
+        <button type="submit" class="btn btn-success me-md-2"
+            onclick="document.getElementById('commento_approva').value = document.getElementById('commento_dirigente').value;">
+            <i class="fas fa-check-circle"></i> Approva Rendiconto
+        </button>
+    </form>
+
+    <form action="{{ url_for('rifiuta_rendiconto', trasferta_id=trasferta.id) }}" method="POST">
+        {# Passiamo il commento come campo nascosto #}
+        <input type="hidden" name="commento_rifiuta" id="commento_rifiuta" value="">
+        <button type="submit" class="btn btn-danger"
+            onclick="document.getElementById('commento_rifiuta').value = document.getElementById('commento_dirigente').value;">
+            <i class="fas fa-times-circle"></i> Rifiuta Rendiconto
+        </button>
+    </form>
+
+</div>
 
 {% else %}
-    <form action="{{ url_for('invia_rendiconto', trasferta_id=trasferta.id) }}" method="POST">
-        
-        {# Spostiamo tutti gli input all'interno di questo form per l'invio corretto #}
-        {# Nota: Se la tua pagina carica dinamicamente i dati con JavaScript, 
-           potresti dover usare la stessa logica di campo nascosto per inviare i valori modificati. 
-           Per semplicità, assumo che tutti i campi nel blocco 1 debbano essere inviati. #}
-           
-        <div class="d-grid gap-2 mt-4">
-            <button type="submit" name="azione" value="invia" class="btn btn-primary">
-                <i class="fas fa-paper-plane"></i> Invia Rendiconto per Approvazione
-            </button>
-        </div>
-    </form>
-    
-{% endif %}
+<form action="{{ url_for('invia_rendiconto', trasferta_id=trasferta.id) }}" method="POST">
 
+    {# Spostiamo tutti gli input all'interno di questo form per l'invio corretto #}
+    {# Nota: Se la tua pagina carica dinamicamente i dati con JavaScript,
+    potresti dover usare la stessa logica di campo nascosto per inviare i valori modificati.
+    Per semplicità, assumo che tutti i campi nel blocco 1 debbano essere inviati. #}
+
+    <div class="d-grid gap-2 mt-4">
+        <button type="submit" name="azione" value="invia" class="btn btn-primary">
+            <i class="fas fa-paper-plane"></i> Invia Rendiconto per Approvazione
+        </button>
+    </div>
+</form>
+
+{% endif %}

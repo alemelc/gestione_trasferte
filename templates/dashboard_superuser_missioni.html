@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Storico Missioni - Superuser{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>📂 Storico Completo Missioni</h2>
+        <a href="{{ url_for('dashboard_superuser') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Torna alla Dashboard
+        </a>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            {% if trasferte %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID / Data Creazione</th>
+                            <th>Richiedente</th>
+                            <th>Data Missione</th>
+                            <th>Motivo</th>
+                            <th>Stato Pre-Missione</th>
+                            <th>Stato Post-Missione</th>
+                            <th style="width: 100px;">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in trasferte %}
+                        <tr>
+                            <td>
+                                <strong>#{{ t.id }}</strong><br>
+                                <small class="text-muted">{{ t.data_richiesta.strftime('%d/%m/%Y' ) }}</small>
+                            </td>
+                            <td>
+                                <div class="fw-bold">{{ t.richiedente.nome }} {{ t.richiedente.cognome }}</div>
+                                <small class="text-muted">{{ t.richiedente.ruolo }}</small>
+                            </td>
+                            <td>
+                                {{ t.giorno_missione.strftime('%d/%m/%Y') }}
+                            </td>
+                            <td>
+                                <span class="d-inline-block text-truncate" style="max-width: 200px;"
+                                    title="{{ t.motivo_missione }}">
+                                    {{ t.motivo_missione }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if t.stato_pre_missione == 'Approvata' %}
+                                <span class="badge bg-success">Approvata</span>
+                                {% elif t.stato_pre_missione == 'Rifiutata' %}
+                                <span class="badge bg-danger">Rifiutata</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">{{ t.stato_pre_missione }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if t.stato_post_missione == 'N/A' %}
+                                <span class="badge bg-secondary">N/A</span>
+                                {% elif 'Rimborso' in t.stato_post_missione %}
+                                <span class="badge bg-info text-dark">{{ t.stato_post_missione }}</span>
+                                {% else %}
+                                <span class="badge bg-light text-dark border">{{ t.stato_post_missione }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('dettagli_trasferta', trasferta_id=t.id, source='superuser_list') }}"
+                                    class="btn btn-outline-primary btn-sm" title="Vedi Dettagli">
+                                    <i class="fas fa-eye"></i> Dettagli
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-4 text-center text-muted">
+                <p class="mb-0">Nessuna missione presente nel sistema.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

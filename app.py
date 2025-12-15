@@ -93,26 +93,21 @@ def is_authorized_approver(trasferta):
 
 # Registra la funzione per renderla disponibile GLOBALMENTE in tutti i template Jinja2
 app.jinja_env.globals.update(is_authorized_approver=is_authorized_approver)
-# Le configurazioni del DB devono essere qui, subito dopo aver creato l'app.
-app.config['SECRET_KEY'] = 'la_tua_chiave_segreta_e_complessa' 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-
-# 2. DETERMINA L'URI DEL DATABASE (Priorità: ENV > Fallback SQLite)
-# Legge la variabile d'ambiente DATABASE_URL
+# 2. DETERMINA L'URI DEL DATABASE
+# DATABASE_URL viene fornito automaticamente da Render
 db_url = os.environ.get("DATABASE_URL")
 
-# Fallback locale a SQLite
-if not db_url:
-    # Usa un path assoluto per SQLite se non è definito
-    db_url = 'sqlite:///' + os.path.join(basedir, 'trasferte.db') 
+if db_url:
+    # Fix per SQLAlchemy: Render usa 'postgres://' ma SQLAlchemy vuole 'postgresql://'
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+else:
+    # Fallback locale a SQLite
+    db_url = 'sqlite:///' + os.path.join(basedir, 'trasferte.db')
 
-
-
-# Configura SECRET_KEY e DATABASE_URI usando le variabili determinate
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_secret_fallback')
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url # ⬅️ USA IL VALORE DETERMINATO SOPRA!
+# Configura SECRET_KEY e DATABASE_URI
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'la_tua_chiave_segreta_e_complessa_fallback') # Usa ENV o fallback
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 try:
@@ -353,7 +348,7 @@ def register():
         cognome = request.form.get('cognome')
         email = request.form.get('email')
         password = request.form.get('password')
-        ruolo = request.form.get('ruolo', 'Dipendente') # Default a Dipendente
+        ruolo = 'Dipendente' # request.form.get('ruolo', 'Dipendente') -> FORZATO A DIPENDENTE
 
         if Dipendente.query.filter_by(email=email).first():
             flash('Email già registrata.', 'warning')
@@ -387,8 +382,8 @@ def register():
 
 # app.py
 
-@app.route('/assegna_dirigenti')
-def assegna_dirigenti():
+@app.route('/associa_dirigente.html')
+def associa_dirigente_script():
     # Trova gli utenti per ID
     rossi = Dipendente.query.get(1) # Mario Rossi, ID 1 (Dirigente)
     bianchi = Dipendente.query.get(2) # Luigi Bianchi, ID 2
@@ -906,6 +901,10 @@ def rendiconta_trasferta(trasferta_id):
             trasferta.mezzo_km_percorsi = request.form.get('mezzo_km_percorsi')
             trasferta.note_rendicontazione = request.form.get('note_rendicontazione')
             
+            # Salvataggio Durata Viaggio (usa i setter del Modello per convertire HH:MM -> min)
+            trasferta.durata_viaggio_andata_str = request.form.get('durata_viaggio_andata')
+            trasferta.durata_viaggio_ritorno_str = request.form.get('durata_viaggio_ritorno')
+            
             # Dati Pausa e Extra Orario
             trasferta.pausa_pranzo_dalle = datetime.strptime(pausa_dalle_str, '%H:%M').time() if pausa_dalle_str else None
             trasferta.pausa_pranzo_alle = datetime.strptime(pausa_alle_str, '%H:%M').time() if pausa_alle_str else None
@@ -1343,7 +1342,8 @@ def report_trasferta(trasferta_id):
         'Da rimborsare', 
         'Rimborso Concesso', 
         'Rimborso negato',
-        'Rimborso Approvato e Liquidato' # <--- NUOVO STATO AGGIUNTO QUI
+        'Rimborso Approvato e Liquidato', # <--- NUOVO STATO AGGIUNTO QUI
+        'Pronto per Rimborso' # <--- AGGIUNTO SU RICHIESTA UTENTE
     ]
     
     if trasferta.stato_post_missione not in STATI_FINALIZZATI:
@@ -1501,6 +1501,52 @@ def dashboard_amministrazione():
     # Per il test, usiamo un template nuovo e minimale
     return render_template('dashboard_amministrazione.html', 
                            trasferte_da_approvare=trasferte_da_approvare)
+
+
+@app.route('/dashboard_superuser')
+@login_required
+@amministrazione_required
+def dashboard_superuser():
+    # Dashboard principale: solo menu di navigazione
+    return render_template('dashboard_superuser.html')
+
+@app.route('/dashboard_superuser/missioni')
+@login_required
+@amministrazione_required
+def dashboard_superuser_missioni():
+    from models import Trasferta
+    trasferte = Trasferta.query.order_by(Trasferta.id.desc()).all()
+    return render_template('dashboard_superuser_missioni.html', trasferte=trasferte)
+
+@app.route('/dashboard_superuser/utenti')
+@login_required
+@amministrazione_required
+def dashboard_superuser_utenti():
+    from models import Dipendente
+    dipendenti = Dipendente.query.order_by(Dipendente.cognome.asc()).all()
+    return render_template('dashboard_superuser_utenti.html', dipendenti=dipendenti)
+
+
+@app.route('/aggiorna_ruolo/<int:dipendente_id>', methods=['POST'])
+@login_required
+@amministrazione_required
+def aggiorna_ruolo(dipendente_id):
+    from models import Dipendente
+    dipendente = Dipendente.query.get_or_404(dipendente_id)
+    
+    nuovo_ruolo = request.form.get('nuovo_ruolo')
+    if nuovo_ruolo in ['Dipendente', 'Dirigente', 'Amministrazione']:
+        dipendente.ruolo = nuovo_ruolo
+        try:
+            db.session.commit()
+            flash(f'Ruolo di {dipendente.nome} {dipendente.cognome} aggiornato a {nuovo_ruolo}.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Errore durante l\'aggiornamento: {e}', 'danger')
+    else:
+        flash('Ruolo non valido.', 'warning')
+        
+    return redirect(url_for('dashboard_superuser'))
 
 
 @app.route('/dettagli_trasferta/<int:trasferta_id>')
