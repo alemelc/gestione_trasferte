@@ -21,7 +21,8 @@
                             <th>Utente</th>
                             <th>Email</th>
                             <th>Ruolo Attuale</th>
-                            <th>Azioni</th>
+                            <th>Ruolo</th>
+                            <th>Reset Password</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -30,9 +31,6 @@
                             <td>{{ d.id }}</td>
                             <td>{{ d.nome }} {{ d.cognome }}</td>
                             <td>{{ d.email }}</td>
-                            <td>
-                                <span class="badge bg-secondary">{{ d.ruolo }}</span>
-                            </td>
                             <td>
                                 <form method="POST" action="{{ url_for('aggiorna_ruolo', dipendente_id=d.id) }}"
                                     class="d-flex align-items-center">
@@ -46,6 +44,17 @@
                                             endif %}>Amministrazione</option>
                                     </select>
                                     <button type="submit" class="btn btn-sm btn-outline-success">Aggiorna</button>
+                                </form>
+                            </td>
+                            <td>
+                                <form method="POST" action="{{ url_for('admin_reset_password', dipendente_id=d.id) }}"
+                                    class="d-flex align-items-center">
+                                    <input type="text" name="nuova_password" class="form-control form-control-sm me-2"
+                                        placeholder="Nuova pass..." style="width: 120px;" required minlength="4">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                        title="Imposta nuova password">
+                                        <i class="fas fa-key"></i> Reset
+                                    </button>
                                 </form>
                             </td>
                         </tr>

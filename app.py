@@ -341,6 +341,34 @@ def logout():
     flash('Sei stato disconnesso.', 'success')
     return redirect(url_for('login'))
 
+@app.route('/cambia_password', methods=['GET', 'POST'])
+@login_required
+def cambia_password():
+    if request.method == 'POST':
+        password_attuale = request.form.get('password_attuale')
+        nuova_password = request.form.get('nuova_password')
+        conferma_password = request.form.get('conferma_password')
+
+        if not check_password_hash(current_user.password_hash, password_attuale):
+            flash('La password attuale non è corretta.', 'danger')
+            return redirect(url_for('cambia_password'))
+        
+        if nuova_password != conferma_password:
+            flash('Le nuove password non coincidono.', 'warning')
+            return redirect(url_for('cambia_password'))
+
+        current_user.password_hash = generate_password_hash(nuova_password, method='scrypt')
+        
+        try:
+            db.session.commit()
+            flash('La tua password è stata aggiornata con successo!', 'success')
+            return redirect(url_for('index'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Errore durante l'aggiornamento: {e}", 'danger')
+
+    return render_template('cambia_password.html')
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -1546,7 +1574,29 @@ def aggiorna_ruolo(dipendente_id):
     else:
         flash('Ruolo non valido.', 'warning')
         
-    return redirect(url_for('dashboard_superuser'))
+    return redirect(url_for('dashboard_superuser_utenti')) # Correggo anche il redirect qui per tornare alla lista
+
+@app.route('/admin_reset_password/<int:dipendente_id>', methods=['POST'])
+@login_required
+@amministrazione_required
+def admin_reset_password(dipendente_id):
+    from models import Dipendente
+    dipendente = Dipendente.query.get_or_404(dipendente_id)
+    
+    nuova_password = request.form.get('nuova_password')
+    
+    if nuova_password and len(nuova_password) >= 4:
+        dipendente.password_hash = generate_password_hash(nuova_password, method='scrypt')
+        try:
+            db.session.commit()
+            flash(f'Password per {dipendente.nome} {dipendente.cognome} reimpostata con successo.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Errore durante il reset password: {e}', 'danger')
+    else:
+        flash('Password troppo corta o mancante.', 'warning')
+        
+    return redirect(url_for('dashboard_superuser_utenti'))
 
 
 @app.route('/dettagli_trasferta/<int:trasferta_id>')
