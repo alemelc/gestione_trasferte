@@ -42,6 +42,8 @@
                                             Dirigente</option>
                                         <option value="Amministrazione" {% if d.ruolo=='Amministrazione' %}selected{%
                                             endif %}>Amministrazione</option>
+                                        <option value="Superuser" {% if d.ruolo=='Superuser' %}selected{% endif %}>
+                                            Superuser</option>
                                     </select>
                                     <button type="submit" class="btn btn-sm btn-outline-success">Aggiorna</button>
                                 </form>

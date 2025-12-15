@@ -138,10 +138,20 @@ def dirigente_required(f):
 def amministrazione_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Assumiamo che il ruolo sia memorizzato come stringa nella colonna 'ruolo'
-        if current_user.ruolo != 'Amministrazione':
-            flash('Accesso negato. Solo gli utenti con ruolo Amministrazione possono eseguire questa azione.', 'danger')
-            return redirect(url_for('index')) # Reindirizza a una pagina sicura
+        # Accesso consentito SOLO all'Amministrazione (Contabilità) e al Superuser (opzionale, ma spesso utile)
+        # Qui manteniamo l'accesso al Superuser per debug/controllo, ma puoi rimuoverlo se vuoi separazione netta.
+        if current_user.ruolo not in ['Amministrazione', 'Superuser']:
+            flash('Accesso negato. Area riservata all\'Amministrazione.', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def superuser_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if current_user.ruolo != 'Superuser':
+            flash('Accesso negato. Area riservata al Superuser.', 'danger')
+            return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -1249,8 +1259,8 @@ def rifiuta_rimborso(trasferta_id):
 def associa_dirigente():
     
     # Controllo di Sicurezza (ridondante se il decorator è attivo, ma utile)
-    if current_user.ruolo != 'Amministrazione':
-        flash('Accesso negato: solo Amministrazione può gestire le associazioni.', 'danger')
+    if current_user.ruolo != 'Superuser':
+        flash('Accesso negato: solo il Superuser può gestire le associazioni.', 'danger')
         # Assicurati che 'dashboard' sia un endpoint valido
         return redirect(url_for('mie_trasferte')) 
 
@@ -1533,14 +1543,14 @@ def dashboard_amministrazione():
 
 @app.route('/dashboard_superuser')
 @login_required
-@amministrazione_required
+@superuser_required
 def dashboard_superuser():
     # Dashboard principale: solo menu di navigazione
     return render_template('dashboard_superuser.html')
 
 @app.route('/dashboard_superuser/missioni')
 @login_required
-@amministrazione_required
+@superuser_required
 def dashboard_superuser_missioni():
     from models import Trasferta
     trasferte = Trasferta.query.order_by(Trasferta.id.desc()).all()
@@ -1548,7 +1558,7 @@ def dashboard_superuser_missioni():
 
 @app.route('/dashboard_superuser/utenti')
 @login_required
-@amministrazione_required
+@superuser_required
 def dashboard_superuser_utenti():
     from models import Dipendente
     dipendenti = Dipendente.query.order_by(Dipendente.cognome.asc()).all()
@@ -1557,13 +1567,13 @@ def dashboard_superuser_utenti():
 
 @app.route('/aggiorna_ruolo/<int:dipendente_id>', methods=['POST'])
 @login_required
-@amministrazione_required
+@superuser_required
 def aggiorna_ruolo(dipendente_id):
     from models import Dipendente
     dipendente = Dipendente.query.get_or_404(dipendente_id)
     
     nuovo_ruolo = request.form.get('nuovo_ruolo')
-    if nuovo_ruolo in ['Dipendente', 'Dirigente', 'Amministrazione']:
+    if nuovo_ruolo in ['Dipendente', 'Dirigente', 'Amministrazione', 'Superuser']:
         dipendente.ruolo = nuovo_ruolo
         try:
             db.session.commit()
@@ -1578,7 +1588,7 @@ def aggiorna_ruolo(dipendente_id):
 
 @app.route('/admin_reset_password/<int:dipendente_id>', methods=['POST'])
 @login_required
-@amministrazione_required
+@superuser_required
 def admin_reset_password(dipendente_id):
     from models import Dipendente
     dipendente = Dipendente.query.get_or_404(dipendente_id)
