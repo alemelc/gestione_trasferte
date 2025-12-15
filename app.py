@@ -341,6 +341,19 @@ def logout():
     flash('Sei stato disconnesso.', 'success')
     return redirect(url_for('login'))
 
+# ROTTA DI EMERGENZA (DA RIMUOVERE DOPO L'USO)
+@app.route('/fix_my_role')
+@login_required
+def fix_my_role():
+    try:
+        current_user.ruolo = 'Amministrazione'
+        db.session.commit()
+        flash(f'Ruolo aggiornato con successo! Ora sei {current_user.ruolo}.', 'success')
+        return redirect(url_for('dashboard_superuser'))
+    except Exception as e:
+        db.session.rollback()
+        return f"Errore: {e}"
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
