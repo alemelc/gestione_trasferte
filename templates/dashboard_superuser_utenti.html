@@ -41,6 +41,8 @@
                                             Dirigente</option>
                                         <option value="Amministrazione" {% if d.ruolo=='Amministrazione' %}selected{%
                                             endif %}>Amministrazione</option>
+                                        <option value="Presenze" {% if d.ruolo=='Presenze' %}selected{% endif %}>
+                                            Presenze</option>
                                         <option value="Superuser" {% if d.ruolo=='Superuser' %}selected{% endif %}>
                                             Superuser</option>
                                     </select>

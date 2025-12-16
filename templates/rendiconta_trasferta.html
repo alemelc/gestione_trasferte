@@ -129,8 +129,8 @@
                             Plus Orario</option>
                         <option value="LAVORO STRAORDINARIO" {% if trasferta.extra_orario=='LAVORO STRAORDINARIO'
                             %}selected{% endif %}>Lavoro Straordinario</option>
-                        <option value="RECUPERO TASTO 4" {% if trasferta.extra_orario=='RECUPERO TASTO 4' %}selected{%
-                            endif %}>Recupero Tasto 4</option>
+                        <option value="TASTO 4" {% if trasferta.extra_orario=='TASTO 4' %}selected{% endif %}>Tasto 4
+                        </option>
                     </select>
                 </div>
             </div>
@@ -314,6 +314,38 @@
         // Aggiorna i totali e la logica 'Altro' per le righe esistenti al caricamento
         updateTotals();
         document.querySelectorAll('.spesa-categoria').forEach(handleOtherCategory);
+
+        // NUOVO: Controllo data rendiconto antecedente data missione
+        const form = document.getElementById('rendiconto-form');
+        // Recuperiamo la data della missione dal server (formato YYYY-MM-DD)
+        const missionDateStr = "{{ trasferta.giorno_missione.strftime('%Y-%m-%d') }}";
+
+        form.addEventListener('submit', function (event) {
+            // Se è il submit triggered dal pulsante standard
+            // Nota: abbiamo un onclick sul pulsante di submit che fa già un confirm.
+            // Possiamo intercettare l'evento submit del form per aggiungere questo check PRELIMINARE.
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Normalizziamo a mezzanotte
+
+            const missionDate = new Date(missionDateStr);
+            missionDate.setHours(0, 0, 0, 0);
+
+            // Se OGGI è PRIMA della data della missione
+            if (today < missionDate) {
+                const confirmed = confirm("Attenzione: La data di richiesta del rendiconto è antecedente alla data della missione. Sei sicuro di voler procedere?");
+                if (!confirmed) {
+                    event.preventDefault(); // Blocca l'invio
+                    return false;
+                }
+            }
+
+            // Il confirm originale del pulsante (salvato nell'onclick) verrà eseguito dopo se questo passa?
+            // In realtà l'onclick inline parte PRIMA del submit del form.
+            // Ma se l'utente annulla nell'onclick, il submit non parte proprio.
+            // Se l'utente dice OK nell'onclick, parte il submit e intercettiamo qui.
+            // Questo va bene.
+        });
     });
 </script>
 {% endblock %}

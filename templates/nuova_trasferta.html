@@ -93,4 +93,36 @@
 
     <button type="submit" class="btn btn-primary btn-lg">Invia Richiesta Pre-Missione</button>
 </form>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const timeEntrata = document.getElementById('aut_timbratura_entrata');
+        const timeUscita = document.getElementById('aut_timbratura_uscita');
+        const motivoTimbratura = document.getElementById('motivo_timbratura');
+        const labelMotivo = document.querySelector('label[for="motivo_timbratura"]');
+
+        function checkTimbraturaRequirement() {
+            if (timeEntrata.value || timeUscita.value) {
+                motivoTimbratura.setAttribute('required', 'required');
+                // Aggiungiamo un indicatore visivo se non c'è già
+                if (!labelMotivo.innerHTML.includes('*')) {
+                    labelMotivo.innerHTML += ' <span class="text-danger">*</span>';
+                }
+            } else {
+                motivoTimbratura.removeAttribute('required');
+                // Rimuoviamo l'indicatore visivo
+                if (labelMotivo.innerHTML.includes('*')) {
+                    labelMotivo.innerHTML = labelMotivo.innerHTML.replace(' <span class="text-danger">*</span>', '');
+                }
+            }
+        }
+
+        // Ascoltatori
+        timeEntrata.addEventListener('change', checkTimbraturaRequirement);
+        timeUscita.addEventListener('change', checkTimbraturaRequirement);
+
+        // Check iniziale (in caso di ricaricamento pagina con dati precompilati)
+        checkTimbraturaRequirement();
+    });
+</script>
 {% endblock %}

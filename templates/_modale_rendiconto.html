@@ -1,5 +1,9 @@
-{% set disabled_attr = 'disabled' if fase == 'rimborso' else '' %}
-{% set readonly_attr = 'readonly' if fase == 'rimborso' else '' %}
+{% set disabled_attr = 'disabled' if (fase == 'rimborso' or readonly_mode) else '' %}
+{% set readonly_attr = 'readonly' if (fase == 'rimborso' or readonly_mode) else '' %}
+
+{# ... (rest of the file content remains the same mostly, just updating the actions block) ... #}
+{# Since replace_file_content needs exact match, I will target the logic at the top first, then the bottom Actions block
+#}
 
 {# La visualizzazione dei dati e delle spese è sempre presente, indipendentemente dalla fase #}
 
@@ -12,9 +16,14 @@
 <p><strong>Richiedente:</strong> {{ req.nome | default('N/A') }} {{ req.cognome | default('N/A') }}</p>
 {% endif %}
 
-<p class="mb-4">
-    Stato post-missione: <span class="badge bg-warning">{{ trasferta.stato_post_missione | default('N/A') }}</span>
+Stato post-missione: <span class="badge bg-warning">{{ trasferta.stato_post_missione | default('N/A') }}</span>
 </p>
+
+{% if trasferta.note_premissione %}
+<div class="alert alert-warning">
+    <strong>Note Pre-Missione:</strong> {{ trasferta.note_premissione }}
+</div>
+{% endif %}
 
 {# Utilizziamo un unico blocco esterno per gli input. Se siamo in fase 'rimborso', i campi sono disabilitati. #}
 <div id="rendiconto_data_inputs">
@@ -138,6 +147,8 @@
 
 <hr>
 
+{% if not readonly_mode %}
+
 {% if fase == 'rimborso' %}
 
 <h5>Decisione sul Rendiconto</h5>
@@ -172,11 +183,6 @@
 {% else %}
 <form action="{{ url_for('invia_rendiconto', trasferta_id=trasferta.id) }}" method="POST">
 
-    {# Spostiamo tutti gli input all'interno di questo form per l'invio corretto #}
-    {# Nota: Se la tua pagina carica dinamicamente i dati con JavaScript,
-    potresti dover usare la stessa logica di campo nascosto per inviare i valori modificati.
-    Per semplicità, assumo che tutti i campi nel blocco 1 debbano essere inviati. #}
-
     <div class="d-grid gap-2 mt-4">
         <button type="submit" name="azione" value="invia" class="btn btn-primary">
             <i class="fas fa-paper-plane"></i> Invia Rendiconto per Approvazione
@@ -184,4 +190,8 @@
     </div>
 </form>
 
+{% endif %}
+
+{% else %}
+<div class="alert alert-secondary mt-3">Modalità Visualizzazione Dettagli (Sola Lettura)</div>
 {% endif %}

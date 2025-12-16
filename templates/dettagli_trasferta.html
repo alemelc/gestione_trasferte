@@ -37,7 +37,7 @@
         <tbody>
             {% for spesa in spese %}
             <tr>
-                <td>{{ spesa.tipo_spesa }}</td>
+                <td>{{ spesa.categoria }}</td>
                 <td>{{ spesa.descrizione or 'N/A' }}</td>
                 <td>{{ "%.2f"|format(spesa.importo) }}</td>
                 <td>{{ spesa.data_spesa.strftime('%d/%m/%Y') }}</td>

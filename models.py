@@ -100,7 +100,7 @@ class Trasferta(db.Model):
     inizio_missione_ora = db.Column(db.Time, nullable=True)
     missione_presso = db.Column(db.Text, nullable=False)
     motivo_missione = db.Column(db.Text, nullable=True)
-    utilizzo_mezzo = db.Column('utilizzo_mezzo', db.String(10), default='No')
+    utilizzo_mezzo = db.Column('utilizzo_mezzo', db.String(50), default='No')
     aut_extra_orario = db.Column('aut_extra_orario', db.String(10), default='No')
     aut_timbratura_entrata = db.Column(db.Time, nullable=True)
     aut_timbratura_uscita = db.Column(db.Time, nullable=True)
@@ -179,6 +179,7 @@ class Trasferta(db.Model):
     note_approvazione_post = db.Column(db.Text, nullable=True)
     
     # --- STATO APPROVAZIONE FINANZIARIA (Fase 3: Amministrazione) ---
+    stato_approvazione_finale = db.Column(db.String(50), nullable=True) # Es: 'Rimborsata', 'Rifiutata'
     id_approvatore_finale = db.Column(db.Integer, db.ForeignKey('dipendente.id'), nullable=True)
     data_approvazione_finale = db.Column(db.DateTime, nullable=True)
     
@@ -194,6 +195,10 @@ class Trasferta(db.Model):
     
     # Chi ha approvato/rifiutato (puntiamo a Dipendente.id)
     id_approvatore_pre = db.Column(db.Integer, db.ForeignKey('dipendente.id'), nullable=True)
+    
+    # --- PRESENZE ---
+    gestito_presenze = db.Column(db.Boolean, default=False)
+    nbp = db.Column(db.Boolean, default=False)
     # --------------------------------------------------------
 
     # Relazioni ORM (per le query Python)
@@ -226,6 +231,11 @@ class Trasferta(db.Model):
         foreign_keys=[id_approvatore_finale]
     )
     
+    @property
+    def totale_spese(self):
+        """Calcola il totale delle spese associate alla trasferta."""
+        return sum(spesa.importo for spesa in self.spese if spesa.importo)
+
     def __repr__(self):
         return f"Trasferta(ID: {self.id}, Dipendente: {self.richiedente.nome}, Stato: {self.stato_pre_missione})"
 

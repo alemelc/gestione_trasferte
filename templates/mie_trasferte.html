@@ -48,6 +48,12 @@
                     {% else %}
                     <span class="badge bg-danger">{{ trasferta.stato_pre_missione }}</span>
                     {% endif %}
+
+                    <!-- Pulsante Dettagli Pre-Missione -->
+                    <button type="button" class="btn btn-outline-dark btn-sm ms-2 open-approvazione-modal"
+                        data-id="{{ trasferta.id }}" data-fase="pre" data-readonly="true" title="Visualizza Dettagli">
+                        Dettagli
+                    </button>
                 </td>
 
                 {# STATO POST-MISSIONE #}
@@ -62,6 +68,15 @@
                     <span class="badge bg-danger">Negato</span>
                     {% else %}
                     <span class="badge bg-info">{{ trasferta.stato_post_missione }}</span>
+                    {% endif %}
+
+                    <!-- Pulsante Dettagli Post-Missione (Solo se c'è qualcosa da vedere) -->
+                    {% if trasferta.stato_post_missione != 'N/A' %}
+                    <button type="button" class="btn btn-outline-dark btn-sm ms-2 open-approvazione-modal"
+                        data-id="{{ trasferta.id }}" data-fase="rendiconto" data-readonly="true"
+                        title="Visualizza Dettagli">
+                        Dettagli
+                    </button>
                     {% endif %}
                 </td>
 
@@ -86,7 +101,7 @@
                         class="btn btn-primary btn-sm">Rendiconta</a>
 
                     {# GESTIONE SPESE #}
-                    {% elif trasferta.stato_post_missione in ['Compilata', 'Pronto per Rimborso'] %}
+                    {% elif trasferta.stato_post_missione == 'Compilata' %}
                     <a href="{{ url_for('gestisci_spese', trasferta_id=trasferta.id) }}"
                         class="btn btn-warning btn-sm mb-1">
                         <i class="fas fa-euro-sign"></i> Gestisci Spese
@@ -218,18 +233,25 @@ document.addEventListener('DOMContentLoaded', function() {
             const contentDiv = document.getElementById('modale-body-content'); 
             const modalTitle = document.getElementById('approvazioneModalLabel');
             
+            const isReadonly = this.dataset.readonly === 'true'; // Legge il data attribute
+            
             // 1. Aggiorna il titolo del modale in base alla fase
             const title = {
                 'pre': 'Dettagli e Approvazione Pre-Missione',
                 'rendiconto': 'Dettagli e Approvazione Rendiconto (Fase Post)',
                 'rimborso': 'Approvazione Rendiconto Finale'
             }[fase];
-            modalTitle.textContent = title;
+            modalTitle.textContent = title + (isReadonly ? ' (Sola Lettura)' : '');
 
             contentDiv.innerHTML = '<p class="text-info">Caricamento in corso...</p>';
             
-            // 2. Chiama la rotta Flask (es: /get_modale_content/5/rimborso)
-            fetch(`/get_modale_content/${trasfertaId}/${fase}`)
+            // 2. Chiama la rotta Flask (es: /get_modale_content/5/rimborso?readonly=true)
+            let url = `/get_modale_content/${trasfertaId}/${fase}`;
+            if (isReadonly) {
+                url += '?readonly=true';
+            }
+
+            fetch(url)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`Errore HTTP ${response.status}: Impossibile caricare il contenuto.`);

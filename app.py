@@ -146,6 +146,14 @@ def amministrazione_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def presenze_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if current_user.ruolo not in ['Presenze', 'Superuser']:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated_function
+
 def superuser_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -270,9 +278,10 @@ def load_user(user_id):
 def get_modale_content(trasferta_id, fase):
 
     trasferta = Trasferta.query.get_or_404(trasferta_id)
+    readonly_mode = request.args.get('readonly') == 'true'
 
     if fase == 'pre':
-        return render_template('_modale_pre.html', trasferta=trasferta, fase=fase)
+        return render_template('_modale_pre.html', trasferta=trasferta, fase=fase, readonly_mode=readonly_mode)
         
     elif fase == 'rendiconto':
         # Per il dipendente: mostra dati effettivi e spese da completare/revisionare
@@ -284,7 +293,8 @@ def get_modale_content(trasferta_id, fase):
                                trasferta=trasferta, 
                                spese=spese, 
                                totale_spese=totale_spese, # Variabile passata
-                               fase=fase)
+                               fase=fase,
+                               readonly_mode=readonly_mode)
         
     elif fase == 'rimborso':
         # Per il dirigente: mostra dati effettivi e spese per l'approvazione finale
@@ -297,7 +307,8 @@ def get_modale_content(trasferta_id, fase):
                                trasferta=trasferta, 
                                spese=spese,
                                totale_spese=totale_spese, # Variabile usata qui
-                               fase=fase)
+                               fase=fase,
+                               readonly_mode=readonly_mode)
     
     else:
         return jsonify({'error': 'Fase non riconosciuta.'}), 400
@@ -573,10 +584,29 @@ def nuova_trasferta():
             flash('Per favore, compila tutti i campi obbligatori.', 'danger')
             return redirect(url_for('nuova_trasferta'))
 
+        # 1.1 VALIDAZIONE TIMBRATURA (Richiesta User)
+        # Se c'è un orario di entrata O di uscita, il motivo è obbligatorio
+        if (aut_timbratura_entrata_str or aut_timbratura_uscita_str) and not motivo_timbratura:
+            flash("Attenzione: Se indichi un orario per la timbratura (entrata o uscita), devi obbligatoriamente compilare il campo 'Motivo Autorizzazione Timbratura'.", 'danger')
+            return redirect(url_for('nuova_trasferta'))
+
         # 2. Conversione della data (CRUCIALE)
         try:
             # Converte la stringa nel formato YYYY-MM-DD in oggetto date
             data_missione = datetime.strptime(giorno_missione_str, '%Y-%m-%d').date()
+            
+            # 2.1 CONTROLLO RETROATTIVITÀ
+            today = date.today()
+            if data_missione < today:
+                msg_retroattivo = "Questa trasferta si è svolta senza autorizzazione preventiva"
+                flash("Attenzione: La data della missione è antecedente a oggi. Verra' segnalata come 'Svolta senza autorizzazione preventiva'.", 'warning')
+                
+                # Aggiungi la nota al campo note_premissione
+                if note_premissione:
+                    note_premissione += f"\n[{msg_retroattivo}]"
+                else:
+                    note_premissione = f"[{msg_retroattivo}]"
+                    
         except ValueError:
             flash('Formato data non valido.', 'danger')
             return redirect(url_for('nuova_trasferta'))
@@ -1197,14 +1227,14 @@ def richiedi_rimborso(trasferta_id):
 def approva_rimborso_finale(trasferta_id):
     trasferta = Trasferta.query.get_or_404(trasferta_id)
     
-    # 1. Verifica Stato Corretto (deve essere 'Pronto per Rimborso')
-    if trasferta.stato_post_missione != 'Pronto per Rimborso':
-        flash(f'Impossibile approvare: la missione non è nello stato corretto. Stato: {trasferta.stato_post_missione}', 'danger')
-        # Reindirizza a una pagina della Amministrazione/Dashboard Finanziaria
-        return redirect(url_for('mie_trasferte')) 
-        
-    # 2. Aggiornamento allo stato finale
-    trasferta.stato_post_missione = 'Rimborso Concesso'
+    # Verifica che la trasferta sia nello stato corretto (cioè pronta per essere rimborsata)
+    if trasferta.stato_post_missione != 'Rimborso Concesso':
+         flash(f'Impossibile approvare: la missione non è nello stato corretto. Stato: {trasferta.stato_post_missione}', 'danger')
+         return redirect(url_for('mie_trasferte')) # Reindirizza a una pagina della Amministrazione/Dashboard Finanziaria
+    
+    # Esegui l'approvazione finale
+    trasferta.stato_approvazione_finale = 'Rimborsata'  # Importante per lo storico!
+    trasferta.stato_post_missione = 'Rimborso Approvato e Liquidato' 
     trasferta.id_approvatore_finale = current_user.id
     trasferta.data_approvazione_finale = datetime.now()
     
@@ -1215,8 +1245,8 @@ def approva_rimborso_finale(trasferta_id):
         db.session.rollback()
         flash(f'Errore nel salvataggio dell\'approvazione finale: {e}', 'danger')
         
-    # Reindirizza a una pagina della Amministrazione/Dashboard Finanziaria (Per ora usiamo mie_trasferte)
-    return redirect(url_for('mie_trasferte'))
+    # Reindirizza alla dashboard corretta
+    return redirect(url_for('dashboard_amministrazione'))
 
 
 
@@ -1529,16 +1559,18 @@ def dashboard_amministrazione():
 
     # 1. Recupera solo le missioni che il Dipartimento Finanziario deve approvare
     trasferte_da_approvare = Trasferta.query.filter(
-        Trasferta.stato_post_missione == 'Pronto per Rimborso'
+        Trasferta.stato_post_missione == 'Rimborso Concesso',
+        Trasferta.stato_approvazione_finale == None
     ).order_by(Trasferta.giorno_missione.asc()).all()
+
+    # 2. Recupera lo storico delle missioni GIA' approvate/processate
+    trasferte_storico = Trasferta.query.filter(
+        Trasferta.stato_approvazione_finale != None
+    ).order_by(Trasferta.data_approvazione_finale.desc()).all()
     
-    # 2. Reindirizzamento temporaneo (se vuoi usare mie_trasferte.html)
-    # Se vuoi usare mie_trasferte.html per il test, devi recuperare tutti i dati 
-    # che quel template si aspetta (es. 'trasferte' generiche)
-    
-    # Per il test, usiamo un template nuovo e minimale
     return render_template('dashboard_amministrazione.html', 
-                           trasferte_da_approvare=trasferte_da_approvare)
+                           trasferte_da_approvare=trasferte_da_approvare,
+                           trasferte_storico=trasferte_storico)
 
 
 @app.route('/dashboard_superuser')
@@ -1573,7 +1605,7 @@ def aggiorna_ruolo(dipendente_id):
     dipendente = Dipendente.query.get_or_404(dipendente_id)
     
     nuovo_ruolo = request.form.get('nuovo_ruolo')
-    if nuovo_ruolo in ['Dipendente', 'Dirigente', 'Amministrazione', 'Superuser']:
+    if nuovo_ruolo in ['Dipendente', 'Dirigente', 'Amministrazione', 'Presenze', 'Superuser']:
         dipendente.ruolo = nuovo_ruolo
         try:
             db.session.commit()
@@ -1639,6 +1671,110 @@ def dettagli_trasferta(trasferta_id):
                            spese=spese_associate,
                            totale_rimborso=totale_rimborso)
 
+
+@app.route('/export_csv_presenze')
+@presenze_required
+def export_csv_presenze():
+    import csv
+    import io
+    from flask import make_response
+
+    # Recupera tutte le trasferte
+    trasferte = Trasferta.query.order_by(Trasferta.giorno_missione.desc()).all()
+
+    # Setup CSV in memoria
+    si = io.StringIO()
+    cw = csv.writer(si, delimiter=';') # Usa punto e virgola per compatibilità Excel IT
+
+    # Intestazioni
+    headers = [
+        'ID', 'Dipendente', 'Data', 'Destinazione', 'Motivo',
+        'Orario Inizio', 'Orario Fine', 'Mezzo', 'Stato Missione',
+        'Extra Orario', 'Pasto', 'Gestito Presenze', 'NBP',
+        'Costo Totale Spese'
+    ]
+    cw.writerow(headers)
+
+    # Dati
+    for t in trasferte:
+        # Gestione sicura dei dati
+        nome_dipendente = "N/D"
+        if t.richiedente:
+            nome_dipendente = f"{t.richiedente.nome} {t.richiedente.cognome}"
+            
+        data_ms = t.giorno_missione.strftime('%d/%m/%Y') if t.giorno_missione else ""
+        
+        # Orari: Preferisci gli effettivi, altrimenti usa i previsti (se esistono)
+        start_time = t.ora_inizio_effettiva or t.inizio_missione_ora
+        end_time = t.ora_fine_effettiva # Non c'è un orario fine previsto nel modello
+        
+        o_inizio = start_time.strftime('%H:%M') if start_time else ""
+        o_fine = end_time.strftime('%H:%M') if end_time else ""
+        
+        # Calcolo costo totale
+        costo_totale = 0.0
+        if t.spese:
+            costo_totale = sum(s.importo for s in t.spese if s.importo) 
+
+        row = [
+            t.id,
+            nome_dipendente,
+            data_ms,
+            t.missione_presso or "",
+            t.motivo_missione or "",
+            o_inizio,
+            o_fine,
+            t.utilizzo_mezzo or "",
+            t.stato_post_missione or "N/A",
+            t.extra_orario.upper() if t.extra_orario else 'EXTRA ORARIO NON PRESENTE',
+            t.richiesta_pausa_pranzo.upper() if t.richiesta_pausa_pranzo else 'NESSUNA',
+            'SI' if t.gestito_presenze else 'NO',
+            'SI' if t.nbp else 'NO',
+            f"{costo_totale:.2f}".replace('.', ',')
+        ]
+        cw.writerow(row)
+
+    output = make_response(si.getvalue())
+    output.headers["Content-Disposition"] = "attachment; filename=export_missioni.csv"
+    output.headers["Content-type"] = "text/csv"
+    return output
+
+# =========================================================================================
+# DASHBOARD PRESENZE
+# =========================================================================================
+@app.route('/dashboard_presenze')
+@login_required
+@presenze_required
+def dashboard_presenze():
+    # Recupera tutte le missioni ordinate per data decrescente
+    trasferte = Trasferta.query.order_by(Trasferta.giorno_missione.desc()).all()
+    return render_template('dashboard_presenze.html', trasferte=trasferte)
+
+@app.route('/api/update_presenze_status', methods=['POST'])
+@login_required
+@presenze_required
+def update_presenze_status():
+    data = request.get_json()
+    trasferta_id = data.get('trasferta_id')
+    field = data.get('field')
+    value = data.get('value')
+
+    if not all([trasferta_id, field]):
+        return jsonify({'error': 'Dati mancanti'}), 400
+
+    trasferta = Trasferta.query.get(trasferta_id)
+    if not trasferta:
+        return jsonify({'error': 'Trasferta non trovata'}), 404
+
+    if field == 'gestito_presenze':
+        trasferta.gestito_presenze = bool(value)
+    elif field == 'nbp':
+        trasferta.nbp = bool(value)
+    else:
+        return jsonify({'error': 'Campo non valido'}), 400
+
+    db.session.commit()
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     # Rimuovi questa riga se usi 'flask run'
