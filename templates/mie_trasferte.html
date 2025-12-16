@@ -94,27 +94,58 @@
                     {# A) AZIONI PER IL RICHIEDENTE (Dipendente/Dirigente che compila/rivedrà) #}
                     {% if trasferta.id_dipendente == current_user.id %}
 
-                    {# PRIORITY 1: Rendicontazione #}
-                    {% if trasferta.stato_pre_missione == 'Approvata' and trasferta.stato_post_missione in ['N/A',
-                    'Rifiutato Post'] %}
-                    <a href="{{ url_for('rendiconta_trasferta', trasferta_id=trasferta.id) }}"
-                        class="btn btn-primary btn-sm">Rendiconta</a>
+                    {# --- MODIFICA PRE-MISSIONE --- #}
+                    {# Gestiamo sia 'In attesa' che 'In Attesa' per sicurezza #}
+                    {% if trasferta.stato_pre_missione in ['In attesa', 'In Attesa'] %}
+                    <a href="{{ url_for('modifica_trasferta', trasferta_id=trasferta.id) }}"
+                        class="btn btn-secondary btn-sm ms-1" title="Modifica Richiesta">
+                        <i class="fas fa-edit"></i> Modifica
+                    </a>
+                    {% endif %}
 
-                    {# GESTIONE SPESE #}
+                    {# PRIORITY 1: Rendicontazione e Modifica Rendiconto #}
+                    {# PRIORITY 1: Rendicontazione e Modifica Rendiconto #}
+                    {# DEBUG: Pre='{{ trasferta.stato_pre_missione }}', Post='{{ trasferta.stato_post_missione }}' #}
+                    {# Permetti modifica se N/A, Compilata, In attesa (varianti), Rifiutato, o Rimborso Richiesto #}
+                    {% if (trasferta.stato_pre_missione == 'Approvata' and trasferta.stato_post_missione in ['N/A',
+                    'Compilata', 'Rifiutato Post'])
+                    or trasferta.stato_post_missione in ['In attesa', 'In Attesa', 'Rimborso Richiesto'] %}
+                    <a href="{{ url_for('rendiconta_trasferta', trasferta_id=trasferta.id) }}"
+                        class="btn btn-primary btn-sm">
+                        {% if trasferta.stato_post_missione in ['N/A', 'Rifiutato Post'] %}
+                        Compila Rendiconto
+                        {% else %}
+                        Modifica Rendiconto
+                        {% endif %}
+                    </a>
+
+                    {# GESTIONE SPESE (Se separata, ma spesso è inclusa nel rendiconto. Lasciamo per sicurezza se serve
+                    accesso diretto) #}
                     {% elif trasferta.stato_post_missione == 'Compilata' %}
+                    {# Se siamo qui, il bottone sopra dovrebbe già coprire, ma controlliamo la logica originale.
+                    La logica originale aveva un bottone 'Gestisci Spese' separato.
+                    Lo integriamo nel 'Modifica Rendiconto' sopra per semplicità, o lo lasciamo se fa cose diverse.
+                    Gestisci spese portava a 'gestisci_spese'. Rendiconta porta a 'rendiconta_trasferta'.
+                    Se rendiconta_trasferta permette anche di gestire le spese, meglio usare quello unico.
+                    Comunque, teniamo il bottone Gestisci Spese se l'utente vuole gestire solo quello.
+                    #}
                     <a href="{{ url_for('gestisci_spese', trasferta_id=trasferta.id) }}"
                         class="btn btn-warning btn-sm mb-1">
                         <i class="fas fa-euro-sign"></i> Gestisci Spese
                     </a>
+                    {% endif %}
 
                     {# Richiesta di Rimborso IN CORSO #}
-                    {% elif trasferta.stato_post_missione == 'Rimborso Richiesto' %}
-                    <span class="badge bg-info">In attesa Approv. Finanziaria</span>
+                    {% if trasferta.stato_post_missione == 'Rimborso Richiesto' or trasferta.stato_post_missione == 'In
+                    attesa' %}
+                    <span class="badge bg-info">In attesa Approvazione</span>
                     {% endif %}
 
                     {# Pulsante Stampa Report (INDIPENDENTE) #}
-                    {% if trasferta.stato_post_missione == 'Pronto per Rimborso' or trasferta.stato_post_missione in
-                    ['Rimborso Concesso', 'Rimborso Negato', 'Compilata'] %}
+                    {# Pulsante Stampa Report (INDIPENDENTE) #}
+                    {# Mostra solo da Pronto per Rimborso in poi #}
+                    {% if trasferta.stato_post_missione in ['Pronto per Rimborso', 'Rimborso Concesso', 'Rimborso
+                    Negato', 'Rimborso Approvato e Liquidato', 'Rimborsata', 'Da rimborsare'] %}
                     <a href="{{ url_for('report_trasferta', trasferta_id=trasferta.id) }}" class="btn btn-info btn-sm"
                         target="_blank">Stampa Report</a>
                     {% endif %}
@@ -128,7 +159,9 @@
                         Dettagli & Approv. Pre
                     </button>
 
-                    {% elif trasferta.stato_post_missione == 'In attesa' %}
+                    {% elif trasferta.stato_post_missione == 'In attesa' or trasferta.stato_post_missione == 'Compilata'
+                    %}
+                    {# Aggiunto 'Compilata' se il workflow prevede approvazione anche in questo stato #}
                     <button type="button" class="btn btn-warning btn-sm mb-1 open-approvazione-modal"
                         data-id="{{ trasferta.id }}" data-fase="rimborso">
                         Dettagli & Approv. Post
@@ -141,7 +174,7 @@
                         style="display:inline;">
                         <button type="submit" class="btn btn-success btn-sm"
                             onclick="return confirm('Confermi l\'approvazione e la liquidazione del rimborso per questa missione? ATTENZIONE: Questa azione è irreversibile.');">
-                            Approva Rimborso Finale
+                            Conferma pagamento
                         </button>
                     </form>
 

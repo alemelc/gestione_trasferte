@@ -3,10 +3,12 @@
 {% block title %}Nuova Richiesta Trasferta (Fase 1){% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Invia Richiesta di Trasferta (FASE 1: PRE MISSIONE)</h2>
+<h2 class="mb-4">{% if trasferta %}Modifica Richiesta{% else %}Invia Richiesta{% endif %} di Trasferta (FASE 1: PRE
+    MISSIONE)</h2>
 <p class="text-muted">I dati inseriti saranno inviati al tuo Dirigente Responsabile per l'autorizzazione preventiva.</p>
 
-<form method="POST">
+<form method="POST"
+    action="{{ url_for('modifica_trasferta', trasferta_id=trasferta.id) if trasferta else url_for('nuova_trasferta') }}">
 
     <fieldset class="p-3 mb-4 border rounded">
         <legend class="float-none w-auto px-2 fs-5">Dettagli Missione</legend>
@@ -14,21 +16,26 @@
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="giorno_missione" class="form-label">GIORNO MISSIONE</label>
-                <input type="date" class="form-control" id="giorno_missione" name="giorno_missione" required>
+                <input type="date" class="form-control" id="giorno_missione" name="giorno_missione"
+                    value="{{ trasferta.giorno_missione.strftime('%Y-%m-%d') if trasferta else '' }}" required>
             </div>
             <div class="col-md-6 mb-3">
                 <label for="inizio_missione_ora" class="form-label">INIZIO MISSIONE ORE (HH:MM)</label>
-                <input type="time" class="form-control" id="inizio_missione_ora" name="inizio_missione_ora" required>
+                <input type="time" class="form-control" id="inizio_missione_ora" name="inizio_missione_ora"
+                    value="{{ trasferta.inizio_missione_ora.strftime('%H:%M') if trasferta and trasferta.inizio_missione_ora else '' }}"
+                    required>
             </div>
         </div>
 
         <div class="mb-3">
             <label for="missione_presso" class="form-label">MISSIONE PRESSO</label>
-            <input type="text" class="form-control" id="missione_presso" name="missione_presso" required>
+            <input type="text" class="form-control" id="missione_presso" name="missione_presso"
+                value="{{ trasferta.missione_presso if trasferta else '' }}" required>
         </div>
         <div class="mb-3">
             <label for="motivo_missione" class="form-label">MOTIVO MISSIONE</label>
-            <textarea class="form-control" id="motivo_missione" name="motivo_missione" rows="2" required></textarea>
+            <textarea class="form-control" id="motivo_missione" name="motivo_missione" rows="2"
+                required>{{ trasferta.motivo_missione if trasferta else '' }}</textarea>
         </div>
     </fieldset>
 
@@ -38,16 +45,18 @@
             <label class="form-label d-block">UTILIZZO MEZZO</label>
             <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="utilizzo_mezzo" id="mezzo_pubblico" value="PUBBLICO"
-                    required>
+                    {% if not trasferta or trasferta.utilizzo_mezzo=='PUBBLICO' %}checked{% endif %} required>
                 <label class="form-check-label" for="mezzo_pubblico">Pubblico</label>
             </div>
             <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="utilizzo_mezzo" id="mezzo_proprio" value="PROPRIO">
+                <input class="form-check-input" type="radio" name="utilizzo_mezzo" id="mezzo_proprio" value="PROPRIO" {%
+                    if trasferta and trasferta.utilizzo_mezzo=='PROPRIO' %}checked{% endif %}>
                 <label class="form-check-label" for="mezzo_proprio">Proprio</label>
             </div>
             <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="utilizzo_mezzo" id="mezzo_amministrazione"
-                    value="AMMINISTRAZIONE">
+                    value="AMMINISTRAZIONE" {% if trasferta and trasferta.utilizzo_mezzo=='AMMINISTRAZIONE' %}checked{%
+                    endif %}>
                 <label class="form-check-label" for="mezzo_amministrazione">Amministrazione</label>
             </div>
         </div>
@@ -59,11 +68,14 @@
         <div class="mb-3">
             <label class="form-label d-block">EVENTUALE STRAORDINARIO AUTORIZZATO</label>
             <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="aut_extra_orario" id="extra_si" value="si" required>
+                <input class="form-check-input" type="radio" name="aut_extra_orario" id="extra_si" value="si" {% if
+                    trasferta and trasferta.extra_orario and trasferta.extra_orario !='NO' %}checked{% endif %}
+                    required>
                 <label class="form-check-label" for="extra_si">SÌ</label>
             </div>
             <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="aut_extra_orario" id="extra_no" value="no" checked>
+                <input class="form-check-input" type="radio" name="aut_extra_orario" id="extra_no" value="no" {% if not
+                    trasferta or not trasferta.extra_orario or trasferta.extra_orario=='NO' %}checked{% endif %}>
                 <label class="form-check-label" for="extra_no">NO</label>
             </div>
         </div>
@@ -72,26 +84,31 @@
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="aut_timbratura_entrata" class="form-label">TIMBRATURA ENTRATA AUTORIZZATA ALLE ORE</label>
-                <input type="time" class="form-control" id="aut_timbratura_entrata" name="aut_timbratura_entrata">
+                <input type="time" class="form-control" id="aut_timbratura_entrata" name="aut_timbratura_entrata"
+                    value="{{ trasferta.aut_timbratura_entrata.strftime('%H:%M') if trasferta and trasferta.aut_timbratura_entrata else '' }}">
             </div>
             <div class="col-md-6 mb-3">
                 <label for="aut_timbratura_uscita" class="form-label">TIMBRATURA USCITA AUTORIZZATA ALLE ORE</label>
-                <input type="time" class="form-control" id="aut_timbratura_uscita" name="aut_timbratura_uscita">
+                <input type="time" class="form-control" id="aut_timbratura_uscita" name="aut_timbratura_uscita"
+                    value="{{ trasferta.aut_timbratura_uscita.strftime('%H:%M') if trasferta and trasferta.aut_timbratura_uscita else '' }}">
             </div>
         </div>
         <div class="mb-3">
             <label for="motivo_timbratura" class="form-label">MOTIVO AUTORIZZAZIONE TIMBRATURA (Obbligatorio se si
                 specificano le ore)</label>
-            <textarea class="form-control" id="motivo_timbratura" name="motivo_timbratura" rows="1"></textarea>
+            <textarea class="form-control" id="motivo_timbratura" name="motivo_timbratura"
+                rows="1">{{ trasferta.motivo_autorizzazione_timbratura if trasferta else '' }}</textarea>
         </div>
         <div class="mb-3">
             <label for="note_premissione" class="form-label">NOTE PRE-MISSIONE</label>
-            <textarea class="form-control" id="note_premissione" name="note_premissione" rows="1"></textarea>
+            <textarea class="form-control" id="note_premissione" name="note_premissione"
+                rows="1">{{ trasferta.note_premissione if trasferta else '' }}</textarea>
         </div>
 
     </fieldset>
 
-    <button type="submit" class="btn btn-primary btn-lg">Invia Richiesta Pre-Missione</button>
+    <button type="submit" class="btn btn-primary btn-lg">{% if trasferta %}Salva Modifiche{% else %}Invia Richiesta
+        Pre-Missione{% endif %}</button>
 </form>
 
 <script>
