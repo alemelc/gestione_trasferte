@@ -1194,32 +1194,31 @@ def approva_rendiconto(trasferta_id):
     # LOGICA DI BIFORCAZIONE: CON SPESE VS. SENZA SPESE
     # ==========================================================
     
-    # Assumiamo che tu abbia un modo per contare le spese (es. tramite il modello Spesa)
-    # Calcola il totale delle spese (o semplicemente il conteggio)
-    # Usiamo 'db.session.query(func.sum(Spesa.importo)).filter(Spesa.id_trasferta == trasferta_id).scalar()' 
-    # o in modo più semplice: trasferta.spese.count() se hai la relazione ORM
-    
-    # NUOVO CODICE (Utilizza il metodo query/scalar per contare in modo sicuro)
-    # Controlla il conteggio delle spese direttamente dal modello Spesa, 
-    # forzando l'esecuzione di una query efficiente SQL:
+    # Controlla il conteggio delle spese direttamente dal modello Spesa
     numero_spese = db.session.query(func.count(Spesa.id)).filter(Spesa.id_trasferta == trasferta_id).scalar()
-
-    # Se preferisci un conteggio più semplice (anche se meno efficiente del scalar()):
-    # numero_spese = Spesa.query.filter_by(id_trasferta=trasferta_id).count()
-    
-    # Se non hai la relazione ORM, puoi contare così:
-    # from models import Spesa
-    # numero_spese = Spesa.query.filter_by(id_trasferta=trasferta_id).count() 
 
     if numero_spese > 0:
         # CASO 1: CI SONO SPESE DA RIMBORSARE (richiede Approvazione Amministrativa)
         trasferta.stato_post_missione = 'Pronto per Rimborso'
         flash_message = 'Rendiconto approvato. Missione in attesa di Approvazione Finanziaria.'
     else:
-            flash(f'Errore durante l\'aggiornamento: {e}', 'danger')
+        # CASO 2: NESSUNA SPESA (Trasferta a costo zero o solo indennità non rimborsabili qui)
+        # Se non ci sono spese, l'iter di rimborso è "virtualmente" concluso o non necessario.
+        # Possiamo segnarla come "Rimborso Concesso" (inteso come "Pratica Chiusa") o direttamente finale.
+        # Per coerenza con il flusso, usiamo 'Rimborso Concesso' che poi l'amministrazione può archiviare definitivamente,
+        # oppure saltiamo direttamente a un stato finale se l'amministrazione non deve fare nulla.
+        # Scegliamo 'Rimborso Concesso' per permettere all'amministrazione di vederla e archiviarla.
+        trasferta.stato_post_missione = 'Rimborso Concesso' 
+        flash_message = 'Rendiconto approvato. Nessuna spesa da rimborsare. Pratica inoltrata all\'amministrazione per chiusura.'
 
-    # GET REQUEST: Mostra il form precompilato
-    return render_template('nuova_trasferta.html', trasferta=trasferta)
+    try:
+        db.session.commit()
+        flash(flash_message, 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore durante l\'aggiornamento: {e}', 'danger')
+        
+    return redirect(url_for('mie_trasferte'))
 
 # Funzione per il rifiuto del rendiconto (Fase Post)
 @app.route('/rifiuta_rendiconto/<int:trasferta_id>', methods=['POST'])
