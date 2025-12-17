@@ -1737,42 +1737,108 @@ def export_csv_presenze():
     import io
     from flask import make_response
 
-    # Recupera tutte le trasferte
-    trasferte = Trasferta.query.order_by(Trasferta.giorno_missione.desc()).all()
+    # Recupera tutte le trasferte con relazioni caricate per performance
+    trasferte = Trasferta.query.options(
+        joinedload(Trasferta.richiedente),
+        joinedload(Trasferta.approvatore_pre),
+        joinedload(Trasferta.approvatore_post),
+        joinedload(Trasferta.spese)
+    ).order_by(Trasferta.giorno_missione.desc()).all()
 
     # Setup CSV in memoria
     si = io.StringIO()
     cw = csv.writer(si, delimiter=';') # Usa punto e virgola per compatibilità Excel IT
 
-    # Intestazioni
+    # Intestazioni Nuove ed Estese
     headers = [
-        'ID', 'Dipendente', 'Data', 'Destinazione', 'Motivo',
-        'Orario Inizio', 'Orario Fine', 'Mezzo', 'Stato Missione',
-        'Extra Orario', 'Pasto', 'Gestito Presenze', 'NBP',
-        'Costo Totale Spese'
+        'ID', 
+        'Dipendente', 
+        'Data Missione', 
+        'Destinazione', 
+        'Motivazione',
+        
+        # Pre-Missione
+        'Stato Pre-Missione',
+        'Ora Inizio Prevista',
+        'Mezzo Previsto',
+        'Aut. Extra Orario (Pre)',
+        'Timbratura Entrata Aut.',
+        'Timbratura Uscita Aut.',
+        'Motivo Timbratura',
+        'Note Pre-Missione',
+        'Approvatore Pre',
+        'Data Approvazione Pre',
+
+        # Post-Missione / Rendiconto
+        'Stato Post-Missione',
+        'Ora Inizio Effettiva', 
+        'Ora Fine Effettiva',
+        'Durata Totale (Ore)',
+        'Pernotto',
+        'Durata Viaggio A (min)',
+        'Durata Viaggio R (min)',
+        'Km Percorsi',
+        'Mezzo Utilizzato',
+        'Percorso Effettuato',
+        'Gestione Pausa Pranzo',
+        'Pausa Pranzo Dalle',
+        'Pausa Pranzo Alle',
+        'Gestione Extra Orario',
+        'Note Rendicontazione',
+        'Approvatore Post',
+        'Data Approvazione Post',
+        
+        # Presenze Check
+        'Gestito Presenze', 
+        'NBP',
+
+        # Spese
+        'Costo Totale Spese',
+        'Dettaglio Spese'
     ]
     cw.writerow(headers)
 
     # Dati
     for t in trasferte:
-        # Gestione sicura dei dati
+        # --- Dipendente ---
         nome_dipendente = "N/D"
         if t.richiedente:
             nome_dipendente = f"{t.richiedente.nome} {t.richiedente.cognome}"
             
         data_ms = t.giorno_missione.strftime('%d/%m/%Y') if t.giorno_missione else ""
         
-        # Orari: Preferisci gli effettivi, altrimenti usa i previsti (se esistono)
-        start_time = t.ora_inizio_effettiva or t.inizio_missione_ora
-        end_time = t.ora_fine_effettiva # Non c'è un orario fine previsto nel modello
+        # --- Pre Missione helper ---
+        ora_inizio_prev = t.inizio_missione_ora.strftime('%H:%M') if t.inizio_missione_ora else ""
+        timb_in = t.aut_timbratura_entrata.strftime('%H:%M') if t.aut_timbratura_entrata else ""
+        timb_out = t.aut_timbratura_uscita.strftime('%H:%M') if t.aut_timbratura_uscita else ""
         
-        o_inizio = start_time.strftime('%H:%M') if start_time else ""
-        o_fine = end_time.strftime('%H:%M') if end_time else ""
+        app_pre_nome = f"{t.approvatore_pre.nome} {t.approvatore_pre.cognome}" if t.approvatore_pre else ""
+        dt_app_pre = t.data_approvazione_pre.strftime('%d/%m/%Y %H:%M') if t.data_approvazione_pre else ""
+
+        # --- Post Missione helper ---
+        ora_inizio_eff = t.ora_inizio_effettiva.strftime('%H:%M') if t.ora_inizio_effettiva else ""
+        ora_fine_eff = t.ora_fine_effettiva.strftime('%H:%M') if t.ora_fine_effettiva else ""
         
-        # Calcolo costo totale
+        pp_dalle = t.pausa_pranzo_dalle.strftime('%H:%M') if t.pausa_pranzo_dalle else ""
+        pp_alle = t.pausa_pranzo_alle.strftime('%H:%M') if t.pausa_pranzo_alle else ""
+        
+        # Note rendiconto pulite da newline
+        note_rend = t.note_rendicontazione.replace('\n', ' | ').replace('\r', '') if t.note_rendicontazione else ""
+        
+        app_post_nome = f"{t.approvatore_post.nome} {t.approvatore_post.cognome}" if t.approvatore_post else ""
+        dt_app_post = t.data_approvazione_post.strftime('%d/%m/%Y %H:%M') if t.data_approvazione_post else ""
+
+        # --- Spese ---
         costo_totale = 0.0
+        dettaglio_spese_list = []
         if t.spese:
-            costo_totale = sum(s.importo for s in t.spese if s.importo) 
+            for s in t.spese:
+                if s.importo:
+                    costo_totale += s.importo
+                    d_spesa = s.data_spesa.strftime('%d/%m/%Y') if s.data_spesa else ""
+                    dettaglio_spese_list.append(f"[{d_spesa} - {s.categoria} - {s.importo:.2f}€ - {s.descrizione or ''}]")
+        
+        dettaglio_spese_str = " | ".join(dettaglio_spese_list)
 
         row = [
             t.id,
@@ -1780,21 +1846,51 @@ def export_csv_presenze():
             data_ms,
             t.missione_presso or "",
             t.motivo_missione or "",
-            o_inizio,
-            o_fine,
+            
+            # Pre
+            t.stato_pre_missione or "",
+            ora_inizio_prev,
             t.utilizzo_mezzo or "",
+            t.aut_extra_orario or "",
+            timb_in,
+            timb_out,
+            t.motivo_timbratura or "",
+            t.note_premissione or "",
+            app_pre_nome,
+            dt_app_pre,
+
+            # Post
             t.stato_post_missione or "N/A",
-            t.extra_orario.upper() if t.extra_orario else 'EXTRA ORARIO NON PRESENTE',
-            t.richiesta_pausa_pranzo.upper() if t.richiesta_pausa_pranzo else 'NESSUNA',
+            ora_inizio_eff,
+            ora_fine_eff,
+            t.durata_totale_ore or "",
+            'SI' if t.pernotto else 'NO',
+            t.durata_viaggio_andata_min or "",
+            t.durata_viaggio_ritorno_min or "",
+            t.km_percorsi or "",
+            t.mezzo_km_percorsi or "",
+            t.percorso_effettuato or "",
+            t.richiesta_pausa_pranzo or "",
+            pp_dalle,
+            pp_alle,
+            t.extra_orario or "",
+            note_rend,
+            app_post_nome,
+            dt_app_post,
+
+            # Presenze
             'SI' if t.gestito_presenze else 'NO',
             'SI' if t.nbp else 'NO',
-            f"{costo_totale:.2f}".replace('.', ',')
+
+            # Spese
+            f"{costo_totale:.2f}".replace('.', ','),
+            dettaglio_spese_str
         ]
         cw.writerow(row)
 
     output = make_response(si.getvalue())
-    output.headers["Content-Disposition"] = "attachment; filename=export_missioni.csv"
-    output.headers["Content-type"] = "text/csv"
+    output.headers["Content-Disposition"] = "attachment; filename=export_missioni_completo.csv"
+    output.headers["Content-type"] = "text/csv; charset=utf-8-sig" # UTF-8 con BOM per Excel
     return output
 
 # =========================================================================================
