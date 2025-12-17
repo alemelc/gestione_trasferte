@@ -1607,12 +1607,13 @@ def dashboard_amministrazione():
 
     # 0. AUTO-MIGRAZIONE DATI LEGACY (Self-Healing)
     # Corregge eventuali vecchi stati 'Pronto per Rimborso' (maschile) in 'Pronta per rimborso' (femminile)
-    # Questo assicura che nessuna missione rimanga orfana dopo il cambio di nome.
-    legacy_updates = Trasferta.query.filter_by(stato_post_missione='Pronto per Rimborso').update({'stato_post_missione': 'Pronta per rimborso'})
-    if legacy_updates > 0:
+    legacy_updates_1 = Trasferta.query.filter_by(stato_post_missione='Pronto per Rimborso').update({'stato_post_missione': 'Pronta per rimborso'})
+    # Corregge 'Rimborso Concesso' in 'Pronta per rimborso' per renderle processabili dall'admin
+    legacy_updates_2 = Trasferta.query.filter_by(stato_post_missione='Rimborso Concesso').update({'stato_post_missione': 'Pronta per rimborso'})
+    
+    if legacy_updates_1 > 0 or legacy_updates_2 > 0:
         db.session.commit()
-        # print(f"DEBUG: Auto-migrati {legacy_updates} record da 'Pronto' a 'Pronta'.")
-
+    
     # 1. Recupera solo le missioni che il Dipartimento Finanziario deve approvare
     # Solo "Pronto per Rimborso" deve apparire qui.
     trasferte_da_approvare = Trasferta.query.filter(
