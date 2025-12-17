@@ -76,7 +76,7 @@
 
                     <td>
                         <span
-                            class="badge {% if t.stato_post_missione == 'Rimborso Concesso' %}bg-success{% elif t.stato_post_missione == 'Rimborso negato' %}bg-danger{% else %}bg-secondary{% endif %}">
+                            class="badge {% if t.stato_post_missione in ['Rimborso Concesso', 'Conclusa', 'Rimborsata'] %}bg-success{% elif t.stato_post_missione in ['Rimborso negato', 'Rifiutata', 'Rifiutata post', 'Rifiutato Post'] %}bg-danger{% else %}bg-secondary{% endif %}">
                             {{ t.stato_post_missione }}
                         </span>
                     </td>

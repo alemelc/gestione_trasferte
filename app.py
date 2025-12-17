@@ -1236,7 +1236,7 @@ def rifiuta_rendiconto(trasferta_id):
         return redirect(url_for('mie_trasferte'))
 
     # 3. AGGIORNAMENTO STATO
-    trasferta.stato_post_missione = 'Rifiutato Post' # Ritorna al dipendente per la correzione
+    trasferta.stato_post_missione = 'Rifiutata post' # Ritorna al dipendente per la correzione
     trasferta.id_approvatore_post = current_user.id
     trasferta.data_approvazione_post = datetime.now() # O data di rifiuto
 
@@ -1245,7 +1245,7 @@ def rifiuta_rendiconto(trasferta_id):
 
     try:
         db.session.commit()
-        flash(f'Rendiconto della trasferta ID {trasferta_id} rifiutato. Lo stato è stato aggiornato a "Rifiutato Post".', 'success')
+        flash(f'Rendiconto della trasferta ID {trasferta_id} rifiutato. Lo stato è stato aggiornato a "Rifiutata post".', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Errore durante l\'aggiornamento dello stato: {e}', 'danger')
@@ -1479,7 +1479,7 @@ def get_dettagli_trasferta(trasferta_id):
     
     # Se la missione è in uno stato post-missione che richiede approvazione (Rimborso Richiesto)
     # o è stata approvata post (Pronto per Rimborso), carichiamo i dati delle spese.
-    stati_con_rendiconto = ['Pronta per rimborso', 'Rimborso Richiesto', 'Rimborso Concesso', 'Rimborso Negato', 'Rifiutato Post']
+    stati_con_rendiconto = ['Pronta per rimborso', 'Rimborso Richiesto', 'Rimborso Concesso', 'Rimborso Negato', 'Rifiutato Post', 'Rifiutata post']
     
     if trasferta.stato_post_missione in stati_con_rendiconto:
         
