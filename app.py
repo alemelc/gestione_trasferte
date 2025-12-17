@@ -95,10 +95,15 @@ def is_authorized_approver(trasferta):
 app.jinja_env.globals.update(is_authorized_approver=is_authorized_approver)
 # 2. DETERMINA L'URI DEL DATABASE
 # DATABASE_URL viene fornito automaticamente da Render
+# POSTGRES_URL viene fornito automaticamente da Vercel Postgres
 db_url = os.environ.get("DATABASE_URL")
 
+if not db_url:
+    # Supporto nativo per Vercel Postgres
+    db_url = os.environ.get("POSTGRES_URL")
+
 if db_url:
-    # Fix per SQLAlchemy: Render usa 'postgres://' ma SQLAlchemy vuole 'postgresql://'
+    # Fix per SQLAlchemy: Render/Vercel usano 'postgres://' ma SQLAlchemy vuole 'postgresql://'
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
 else:
