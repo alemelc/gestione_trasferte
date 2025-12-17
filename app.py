@@ -1899,60 +1899,6 @@ def export_csv_presenze():
     return output
 
 # =========================================================================================
-# UTILITY: SETUP ROUTE PER VERCEL (SENZA CLI)
-# =========================================================================================
-@app.route('/setup_app_first_time')
-def setup_app_first_time():
-    """
-    Rotta di utility per inizializzare il DB e creare il Superuser su ambienti Serverless (Vercel)
-    dove non c'è accesso diretto alla shell.
-    Protetto da SECRET_KEY.
-    """
-    key = request.args.get('key')
-    
-    # 1. Protezione semplice: La chiave passata deve corrispondere alla SECRET_KEY dell'app
-    if not key or key != app.config['SECRET_KEY']:
-        return "<h1>Accesso Negato</h1><p>Chiave di sicurezza errata o mancante.</p>", 403
-
-    try:
-        # 2. Crea tutte le tabelle (se non esistono)
-        # Su Vercel/Postgres questo è il modo più rapido per iniziare senza gestire le migrazioni al primo avvio
-        db.create_all()
-        msg = "<h3>1. Struttura Database verificata/creata con successo.</h3>"
-
-        # 3. Crea Utente Superuser Default
-        ADMIN_EMAIL = 'admin@super.it'
-        existing_admin = Dipendente.query.filter_by(email=ADMIN_EMAIL).first()
-        
-        if not existing_admin:
-            # Crea nuovo
-            # Nota: Usa 'scrypt' come nel resto dell'app
-            hashed_pwd = generate_password_hash('adminpassword', method='scrypt')
-            
-            admin_user = Dipendente(
-                nome='Super',
-                cognome='Admin',
-                email=ADMIN_EMAIL,
-                password_hash=hashed_pwd,
-                ruolo='Superuser',
-                id_dirigente=None # Superuser non ha capi
-            )
-            
-            db.session.add(admin_user)
-            db.session.commit()
-            msg += f"<p>2. ✅ Utente Superuser creato: <b>{ADMIN_EMAIL}</b> / <b>adminpassword</b></p>"
-        else:
-            msg += f"<p>2. ℹ️ Utente Superuser {ADMIN_EMAIL} esiste già. Nessuna modifica.</p>"
-
-        msg += """
-        <hr>
-        <p><b>Setup Completato!</b></p>
-        <p>Ora puoi andare alla <a href='/login'>Pagina di Login</a>.</p>
-        """
-        return msg
-
-    except Exception as e:
-        return f"<h1>Errore durante il setup</h1><p>{e}</p>", 500
 # DASHBOARD PRESENZE
 # =========================================================================================
 @app.route('/dashboard_presenze')
