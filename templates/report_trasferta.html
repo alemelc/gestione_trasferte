@@ -37,13 +37,49 @@
                             <tr>
                                 <td><strong>Stato Pre-Missione:</strong></td>
                                 <td><span
-                                        class="badge bg-{{ 'success' if trasferta.stato_post_missione in ['Da rimborsare', 'Rimborso Concesso', 'Rimborso Approvato e Liquidato'] else 'danger' if trasferta.stato_post_missione == 'Rimborso negato' else 'info' }}">{{
-                                        trasferta.stato_post_missione }}</span></td>
+                                        class="badge bg-{{ 'success' if trasferta.stato_pre_missione == 'Approvata' else 'danger' if trasferta.stato_pre_missione == 'Rifiutata' else 'warning' }}">{{
+                                        trasferta.stato_pre_missione }}</span></td>
                             </tr>
+                            <tr>
+                                <td><strong>Ora Inizio Prevista:</strong></td>
+                                <td>{{ trasferta.inizio_missione_ora.strftime('%H:%M') if trasferta.inizio_missione_ora
+                                    else 'N/D' }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Mezzo Previsto:</strong></td>
+                                <td>{{ trasferta.utilizzo_mezzo }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Aut. Extra Orario (Pre):</strong></td>
+                                <td>{{ trasferta.aut_extra_orario }}</td>
+                            </tr>
+                            {% if trasferta.aut_timbratura_entrata or trasferta.aut_timbratura_uscita %}
+                            <tr>
+                                <td><strong>Timbrature Autorizzate:</strong></td>
+                                <td>
+                                    {% if trasferta.aut_timbratura_entrata %}Entrata: {{
+                                    trasferta.aut_timbratura_entrata.strftime('%H:%M') }}<br>{% endif %}
+                                    {% if trasferta.aut_timbratura_uscita %}Uscita: {{
+                                    trasferta.aut_timbratura_uscita.strftime('%H:%M') }}<br>{% endif %}
+                                    (Motivo: {{ trasferta.motivo_timbratura or '-' }})
+                                </td>
+                            </tr>
+                            {% endif %}
+                            {% if trasferta.note_premissione %}
+                            <tr>
+                                <td><strong>Note Pre-Missione:</strong></td>
+                                <td>{{ trasferta.note_premissione }}</td>
+                            </tr>
+                            {% endif %}
                             <tr>
                                 <td><strong>Approvato Pre da:</strong></td>
                                 <td>{{ trasferta.approvatore_pre.nome }} {{ trasferta.approvatore_pre.cognome }} (ID: {{
-                                    trasferta.id_approvatore_pre or 'N/D' }})</td>
+                                    trasferta.id_approvatore_pre or 'N/D' }})
+                                    {% if trasferta.data_approvazione_pre %}
+                                    <br><small class="text-muted">il {{
+                                        trasferta.data_approvazione_pre.strftime('%d/%m/%Y alle %H:%M') }}</small>
+                                    {% endif %}
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -188,21 +224,75 @@
 <style>
     /* Nasconde la barra di navigazione e altri elementi non stampabili */
     @media print {
+        @page {
+            size: A4;
+            margin: 10mm;
+        }
 
         .navbar,
         .footer,
         .d-print-none,
-        .alert {
+        .alert,
+        button {
             display: none !important;
-        }
-
-        .printable-area {
-            margin: 0 !important;
-            padding: 0 !important;
         }
 
         body {
             background-color: #fff;
+            font-size: 12px;
+            /* Riduce leggermente il font per far stare tutto */
+        }
+
+        .printable-area {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .container,
+        .container-fluid,
+        .row,
+        .col-lg-10 {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            flex: 0 0 100% !important;
+        }
+
+        .card {
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .card-header {
+            background-color: #f8f9fa !important;
+            /* Grigio chiaro invece di blu per risparmiare inchiostro */
+            color: #000 !important;
+            border-bottom: 2px solid #000 !important;
+        }
+
+        .card-body {
+            padding: 0 !important;
+        }
+
+        /* Gestione tabelle */
+        table {
+            page-break-inside: auto;
+            width: 100% !important;
+        }
+
+        tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+
+        /* Assicura che i badge siano leggibili in BN */
+        .badge {
+            border: 1px solid #000;
+            color: #000 !important;
+            background-color: transparent !important;
         }
     }
 </style>

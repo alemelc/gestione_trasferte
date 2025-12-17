@@ -25,6 +25,7 @@
                     <th>Data</th>
                     <th style="width: 15%;">Destinazione</th>
                     <th style="width: 10%;">Motivo</th>
+                    <th style="width: 10%;">Spese (€)</th>
                     <th style="width: 10%;">Extra Orario</th>
                     <th style="width: 10%;">Pasto</th>
                     <th>Stato Finale</th>
@@ -45,10 +46,12 @@
                     <th><input type="text" class="form-control form-control-sm column-filter" data-col="4"
                             placeholder="Filtra Motivo"></th>
                     <th><input type="text" class="form-control form-control-sm column-filter" data-col="5"
-                            placeholder="Filtra Extra"></th>
+                            placeholder="Filtra Spese"></th>
                     <th><input type="text" class="form-control form-control-sm column-filter" data-col="6"
-                            placeholder="Filtra Pasto"></th>
+                            placeholder="Filtra Extra"></th>
                     <th><input type="text" class="form-control form-control-sm column-filter" data-col="7"
+                            placeholder="Filtra Pasto"></th>
+                    <th><input type="text" class="form-control form-control-sm column-filter" data-col="8"
                             placeholder="Filtra Stato"></th>
                     <th></th> <!-- No filter for Azioni -->
                     <th></th> <!-- No filter for Checkbox -->
@@ -63,6 +66,7 @@
                     <td>{{ t.giorno_missione.strftime('%d/%m/%Y') }}</td>
                     <td>{{ t.missione_presso }}</td>
                     <td>{{ t.motivo_missione | default('-', true) }}</td>
+                    <td>{{ "%.2f"|format(t.totale_spese) }}</td>
 
                     {# Colonna Extra Orario #}
                     <td>{{ t.extra_orario | default('-', true) }}</td>
@@ -146,7 +150,15 @@
                         value: isChecked
                     })
                 })
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            // Se la risposta non è 200-299, lancia un errore con lo status
+                            return response.text().then(text => {
+                                throw new Error(`Server error: ${response.status} - ${text}`);
+                            });
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         if (data.success) {
                             console.log('Update riuscito');
@@ -157,7 +169,7 @@
                     })
                     .catch(err => {
                         console.error('Fetch error:', err);
-                        alert('Errore di comunicazione con il server.');
+                        alert('Errore di comunicazione con il server. Vedi console per dettagli.');
                         this.checked = !isChecked; // Revert
                     });
             });

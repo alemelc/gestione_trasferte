@@ -5,7 +5,7 @@
 # ====================================================================
 import os
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -1203,13 +1203,9 @@ def approva_rendiconto(trasferta_id):
         flash_message = 'Rendiconto approvato. Missione in attesa di Approvazione Finanziaria.'
     else:
         # CASO 2: NESSUNA SPESA (Trasferta a costo zero o solo indennità non rimborsabili qui)
-        # Se non ci sono spese, l'iter di rimborso è "virtualmente" concluso o non necessario.
-        # Possiamo segnarla come "Rimborso Concesso" (inteso come "Pratica Chiusa") o direttamente finale.
-        # Per coerenza con il flusso, usiamo 'Rimborso Concesso' che poi l'amministrazione può archiviare definitivamente,
-        # oppure saltiamo direttamente a un stato finale se l'amministrazione non deve fare nulla.
-        # Scegliamo 'Rimborso Concesso' per permettere all'amministrazione di vederla e archiviarla.
-        trasferta.stato_post_missione = 'Rimborso Concesso' 
-        flash_message = 'Rendiconto approvato. Nessuna spesa da rimborsare. Pratica inoltrata all\'amministrazione per chiusura.'
+        # Se non ci sono spese, l'iter di rimborso è concluso.
+        trasferta.stato_post_missione = 'Conclusa'
+        flash_message = 'Rendiconto approvato. Nessuna spesa da rimborsare. Missione conclusa.'
 
     try:
         db.session.commit()
@@ -1280,19 +1276,19 @@ def approva_rimborso_finale(trasferta_id):
     trasferta = Trasferta.query.get_or_404(trasferta_id)
     
     # Verifica che la trasferta sia nello stato corretto (cioè pronta per essere rimborsata)
-    if trasferta.stato_post_missione != 'Rimborso Concesso':
+    if trasferta.stato_post_missione != 'Pronto per Rimborso':
          flash(f'Impossibile approvare: la missione non è nello stato corretto. Stato: {trasferta.stato_post_missione}', 'danger')
          return redirect(url_for('mie_trasferte')) # Reindirizza a una pagina della Amministrazione/Dashboard Finanziaria
     
     # Esegui l'approvazione finale
     trasferta.stato_approvazione_finale = 'Rimborsata'  # Importante per lo storico!
-    trasferta.stato_post_missione = 'Rimborso Approvato e Liquidato' 
+    trasferta.stato_post_missione = 'Rimborsata'
     trasferta.id_approvatore_finale = current_user.id
     trasferta.data_approvazione_finale = datetime.now()
     
     try:
         db.session.commit()
-        flash('Rimborso approvato e liquidato con successo. Missione completata.', 'success')
+        flash('Rimborso confermato e missione conclusa con stato "Rimborsata".', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Errore nel salvataggio dell\'approvazione finale: {e}', 'danger')
@@ -1610,8 +1606,9 @@ def dashboard_amministrazione():
     from models import Trasferta # Assicurati che sia importato
 
     # 1. Recupera solo le missioni che il Dipartimento Finanziario deve approvare
+    # Solo "Pronto per Rimborso" deve apparire qui.
     trasferte_da_approvare = Trasferta.query.filter(
-        Trasferta.stato_post_missione == 'Rimborso Concesso',
+        Trasferta.stato_post_missione == 'Pronto per Rimborso',
         Trasferta.stato_approvazione_finale == None
     ).order_by(Trasferta.giorno_missione.asc()).all()
 
@@ -1816,17 +1813,21 @@ def update_presenze_status():
 
     trasferta = Trasferta.query.get(trasferta_id)
     if not trasferta:
-        return jsonify({'error': 'Trasferta non trovata'}), 404
+        return jsonify({'success': False, 'error': 'Trasferta non trovata'}), 404
 
-    if field == 'gestito_presenze':
-        trasferta.gestito_presenze = bool(value)
-    elif field == 'nbp':
-        trasferta.nbp = bool(value)
-    else:
-        return jsonify({'error': 'Campo non valido'}), 400
+    try:
+        if field == 'gestito_presenze':
+            trasferta.gestito_presenze = bool(value)
+        elif field == 'nbp':
+            trasferta.nbp = bool(value)
+        else:
+            return jsonify({'success': False, 'error': 'Campo non valido'}), 400
 
-    db.session.commit()
-    return jsonify({'success': True})
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Rimuovi questa riga se usi 'flask run'
