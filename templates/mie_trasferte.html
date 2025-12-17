@@ -45,8 +45,10 @@
                     <span class="badge bg-warning text-dark">{{ trasferta.stato_pre_missione }}</span>
                     {% elif trasferta.stato_pre_missione == 'Approvata' %}
                     <span class="badge bg-success">{{ trasferta.stato_pre_missione }}</span>
-                    {% else %}
+                    {% elif trasferta.stato_pre_missione == 'Rifiutata' %}
                     <span class="badge bg-danger">{{ trasferta.stato_pre_missione }}</span>
+                    {% else %}
+                    <span class="badge bg-secondary">{{ trasferta.stato_pre_missione }}</span>
                     {% endif %}
 
                     <!-- Pulsante Dettagli Pre-Missione -->
@@ -60,12 +62,11 @@
                 <td>
                     {% if trasferta.stato_post_missione == 'In attesa' %}
                     <span class="badge bg-warning text-dark">{{ trasferta.stato_post_missione }}</span>
-                    {% elif trasferta.stato_post_missione == 'Da rimborsare' %}
-                    <span class="badge bg-success">Approvato</span>
-                    {% elif trasferta.stato_post_missione == 'Rimborso Concesso' %}
-                    <span class="badge bg-success">Rimborsato</span>
-                    {% elif trasferta.stato_post_missione == 'Rimborso negato' %}
-                    <span class="badge bg-danger">Negato</span>
+                    {% elif trasferta.stato_post_missione in ['Conclusa', 'Rimborsata', 'Rimborso Concesso', 'Rimborso
+                    Approvato e Liquidato', 'Da rimborsare'] %}
+                    <span class="badge bg-success">{{ trasferta.stato_post_missione }}</span>
+                    {% elif trasferta.stato_post_missione in ['Rimborso negato', 'Rifiutato Post'] %}
+                    <span class="badge bg-danger">{{ trasferta.stato_post_missione }}</span>
                     {% else %}
                     <span class="badge bg-info">{{ trasferta.stato_post_missione }}</span>
                     {% endif %}
@@ -144,7 +145,7 @@
                     {# Pulsante Stampa Report (INDIPENDENTE) #}
                     {# Pulsante Stampa Report (INDIPENDENTE) #}
                     {# Mostra solo da Pronto per Rimborso in poi #}
-                    {% if trasferta.stato_post_missione in ['Pronto per Rimborso', 'Rimborso Concesso', 'Rimborso
+                    {% if trasferta.stato_post_missione in ['Pronta per rimborso', 'Rimborso Concesso', 'Rimborso
                     Negato', 'Rimborso Approvato e Liquidato', 'Rimborsata', 'Da rimborsare'] %}
                     <a href="{{ url_for('report_trasferta', trasferta_id=trasferta.id) }}" class="btn btn-info btn-sm"
                         target="_blank">Stampa Report</a>
@@ -168,7 +169,7 @@
                     </button>
 
                     {# APPROVAZIONE RIMBORSO FINANZIARIO - (DA INSERIRE PIÙ AVANTI) #}
-                    {% elif trasferta.stato_post_missione == 'Pronto per Rimborso' and current_user.ruolo ==
+                    {% elif trasferta.stato_post_missione == 'Pronta per rimborso' and current_user.ruolo ==
                     'Amministrazione' %}
                     <form method="POST" action="{{ url_for('approva_rimborso_finale', trasferta_id=trasferta.id) }}"
                         style="display:inline;">

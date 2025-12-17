@@ -1153,7 +1153,7 @@ def invia_rendiconto(trasferta_id):
 
         if is_auto_approving_dirigente:
             # Sovrascrive i valori di default
-            stato_post_finale = 'Pronto per Rimborso' # O 'Approvata' se preferisci questo termine
+            stato_post_finale = 'Pronta per rimborso' # O 'Approvata' se preferisci questo termine
             id_approvatore_post_finale = current_user.id
             data_app_post_finale = datetime.now()
             final_flash_message = 'Rendiconto salvato e auto-approvato (Dirigente). Ora è pronto per il rimborso finanziario.'
@@ -1199,7 +1199,7 @@ def approva_rendiconto(trasferta_id):
 
     if numero_spese > 0:
         # CASO 1: CI SONO SPESE DA RIMBORSARE (richiede Approvazione Amministrativa)
-        trasferta.stato_post_missione = 'Pronto per Rimborso'
+        trasferta.stato_post_missione = 'Pronta per rimborso'
         flash_message = 'Rendiconto approvato. Missione in attesa di Approvazione Finanziaria.'
     else:
         # CASO 2: NESSUNA SPESA (Trasferta a costo zero o solo indennità non rimborsabili qui)
@@ -1258,7 +1258,7 @@ def richiedi_rimborso(trasferta_id):
     trasferta = Trasferta.query.get_or_404(trasferta_id)
     
     # Verifica che sia il richiedente e che lo stato sia corretto
-    if trasferta.id_dipendente != current_user.id or trasferta.stato_post_missione != 'Pronto per Rimborso':
+    if trasferta.id_dipendente != current_user.id or trasferta.stato_post_missione != 'Pronta per rimborso':
         flash('Non puoi richiedere il rimborso in questo stato o per questa missione.', 'danger')
         return redirect(url_for('mie_trasferte'))
 
@@ -1276,7 +1276,7 @@ def approva_rimborso_finale(trasferta_id):
     trasferta = Trasferta.query.get_or_404(trasferta_id)
     
     # Verifica che la trasferta sia nello stato corretto (cioè pronta per essere rimborsata)
-    if trasferta.stato_post_missione != 'Pronto per Rimborso':
+    if trasferta.stato_post_missione != 'Pronta per rimborso':
          flash(f'Impossibile approvare: la missione non è nello stato corretto. Stato: {trasferta.stato_post_missione}', 'danger')
          return redirect(url_for('mie_trasferte')) # Reindirizza a una pagina della Amministrazione/Dashboard Finanziaria
     
@@ -1459,7 +1459,7 @@ def report_trasferta(trasferta_id):
         'Rimborso Concesso', 
         'Rimborso negato',
         'Rimborso Approvato e Liquidato', # <--- NUOVO STATO AGGIUNTO QUI
-        'Pronto per Rimborso' # <--- AGGIUNTO SU RICHIESTA UTENTE
+        'Pronta per rimborso' # <--- AGGIUNTO SU RICHIESTA UTENTE
     ]
     
     if trasferta.stato_post_missione not in STATI_FINALIZZATI:
@@ -1479,7 +1479,7 @@ def get_dettagli_trasferta(trasferta_id):
     
     # Se la missione è in uno stato post-missione che richiede approvazione (Rimborso Richiesto)
     # o è stata approvata post (Pronto per Rimborso), carichiamo i dati delle spese.
-    stati_con_rendiconto = ['Pronto per Rimborso', 'Rimborso Richiesto', 'Rimborso Concesso', 'Rimborso Negato', 'Rifiutato Post']
+    stati_con_rendiconto = ['Pronta per rimborso', 'Rimborso Richiesto', 'Rimborso Concesso', 'Rimborso Negato', 'Rifiutato Post']
     
     if trasferta.stato_post_missione in stati_con_rendiconto:
         
@@ -1605,10 +1605,18 @@ def gestisci_spese(trasferta_id):
 def dashboard_amministrazione():
     from models import Trasferta # Assicurati che sia importato
 
+    # 0. AUTO-MIGRAZIONE DATI LEGACY (Self-Healing)
+    # Corregge eventuali vecchi stati 'Pronto per Rimborso' (maschile) in 'Pronta per rimborso' (femminile)
+    # Questo assicura che nessuna missione rimanga orfana dopo il cambio di nome.
+    legacy_updates = Trasferta.query.filter_by(stato_post_missione='Pronto per Rimborso').update({'stato_post_missione': 'Pronta per rimborso'})
+    if legacy_updates > 0:
+        db.session.commit()
+        # print(f"DEBUG: Auto-migrati {legacy_updates} record da 'Pronto' a 'Pronta'.")
+
     # 1. Recupera solo le missioni che il Dipartimento Finanziario deve approvare
     # Solo "Pronto per Rimborso" deve apparire qui.
     trasferte_da_approvare = Trasferta.query.filter(
-        Trasferta.stato_post_missione == 'Pronto per Rimborso',
+        Trasferta.stato_post_missione == 'Pronta per rimborso',
         Trasferta.stato_approvazione_finale == None
     ).order_by(Trasferta.giorno_missione.asc()).all()
 
