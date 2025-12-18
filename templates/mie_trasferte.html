@@ -146,7 +146,7 @@
                     {# Pulsante Stampa Report (INDIPENDENTE) #}
                     {# Mostra solo da Pronto per Rimborso in poi #}
                     {% if trasferta.stato_post_missione in ['Pronta per rimborso', 'Rimborso Concesso', 'Rimborso
-                    Negato', 'Rimborso Approvato e Liquidato', 'Rimborsata', 'Da rimborsare'] %}
+                    Negato', 'Rimborso Approvato e Liquidato', 'Rimborsata', 'Da rimborsare', 'Conclusa'] %}
                     <a href="{{ url_for('report_trasferta', trasferta_id=trasferta.id) }}" class="btn btn-info btn-sm"
                         target="_blank">Stampa Report</a>
                     {% endif %}
