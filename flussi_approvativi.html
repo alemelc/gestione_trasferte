@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Flussi Approvativi - Gestione Trasferte</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: { curve: 'basis' }
+        });
+    </script>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .mermaid {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        @media print {
+            body {
+                padding: 0;
+            }
+
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1 class="no-print">Diagramma Flussi Approvativi</h1>
+    <p class="no-print" style="color: #666;">Per salvare come PDF: Premi <strong>CTRL+P</strong> (o Stampa) e seleziona
+        "Salva come PDF" come destinazione.</p>
+
+    <div class="mermaid">
+        stateDiagram-v2
+        direction LR
+
+        state "Nuova Richiesta" as New
+        state "In attesa (Pre)" as PreWait
+        state "Approvata" as PreApproved
+        state "Rifiutata" as PreRejected
+        state "Svolgimento Missione" as Mission
+        state "Compilazione Rendiconto" as Reporting
+        state "In attesa (Post)" as PostWait
+        state "Pronta per rimborso" as ReadyRefund
+        state "Conclusa (No Spese)" as Closed
+        state "Rimborso Concesso" as RefundGranted
+        state "Rimborsata" as Refunded
+        state "Rifiutata Post" as PostRejected
+
+        %% Pre-Mission Flow
+        [*] --> New
+
+        state if_dirigente_pre <<choice>>
+            New --> if_dirigente_pre
+
+            if_dirigente_pre --> PreApproved : Dirigente (Auto-Approvazione)
+            if_dirigente_pre --> PreWait : Dipendente (Richiede Approvazione)
+
+            PreWait --> PreApproved : Approvazione Manager
+            PreWait --> PreRejected : Rifiuto Manager
+
+            PreApproved --> Mission : Data Missione Arrivata
+            PreRejected --> [*]
+
+            %% Post-Mission Flow
+            Mission --> Reporting
+
+            state if_dirigente_post <<choice>>
+                Reporting --> if_dirigente_post : Invia Rendiconto
+
+                if_dirigente_post --> PostWait : Dipendente
+                if_dirigente_post --> if_expenses : Dirigente (Auto-Approvazione)
+
+                state if_expenses <<choice>>
+                    if_expenses --> ReadyRefund : Spese > 0
+                    if_expenses --> Closed : Spese = 0
+
+                    PostWait --> ReadyRefund : Approvazione Manager
+                    PostWait --> PostRejected : Rifiuto Manager
+
+                    %% Financial Flow
+                    ReadyRefund --> RefundGranted : Amministrazione (Approvazione)
+                    ReadyRefund --> PostRejected : Amministrazione (Rifiuto)
+
+                    RefundGranted --> Refunded : Pagamento Effettuato
+
+                    Closed --> [*]
+                    Refunded --> [*]
+                    PostRejected --> [*]
+    </div>
+</body>
+
+</html>

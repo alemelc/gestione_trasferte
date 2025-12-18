@@ -66,7 +66,7 @@
                 <td>{{ "%.2f"|format(trasferta.totale_spese) }} €</td>
                 <td>
                     <span
-                        class="badge {% if trasferta.stato_post_missione == 'In attesa' %}bg-warning{% elif trasferta.stato_post_missione == 'Da rimborsare' %}bg-info text-dark{% elif trasferta.stato_post_missione == 'Rimborso Concesso' %}bg-success{% elif trasferta.stato_post_missione == 'Rimborso negato' %}bg-danger{% else %}bg-secondary{% endif %}">
+                        class="badge {% if trasferta.stato_post_missione == 'In attesa' %}bg-warning{% elif trasferta.stato_post_missione == 'Da rimborsare' %}bg-info text-dark{% elif trasferta.stato_post_missione == 'Rimborso Concesso' %}bg-success{% elif trasferta.stato_post_missione == 'Rimborso negato' or trasferta.stato_post_missione == 'Non rimborsata' %}bg-danger{% else %}bg-secondary{% endif %}">
                         {{ trasferta.stato_approvazione_finale if trasferta.stato_approvazione_finale else
                         trasferta.stato_post_missione }}
                     </span>
@@ -81,6 +81,14 @@
                             <button type="submit" class="btn btn-success btn-sm"
                                 onclick="return confirm('Confermi l\'approvazione e la liquidazione del rimborso?');">
                                 Conferma pagamento
+                            </button>
+                        </form>
+
+                        <form method="POST" action="{{ url_for('rifiuta_rimborso_finale', trasferta_id=trasferta.id) }}"
+                            style="display:inline;">
+                            <button type="submit" class="btn btn-danger btn-sm"
+                                onclick="return confirm('Sei sicuro di voler IMPOSTARE lo stato come NON RIMBORSATA?');">
+                                Rifiuta pagamento
                             </button>
                         </form>
                     </div>
@@ -134,7 +142,8 @@
                 <td>{{ t.motivo_missione }}</td>
                 <td>{{ "%.2f"|format(t.totale_spese) }} €</td>
                 <td>
-                    <span class="badge bg-success">
+                    <span
+                        class="badge {% if t.stato_approvazione_finale == 'Non rimborsata' or t.stato_approvazione_finale == 'Rimborso negato' %}bg-danger{% else %}bg-success{% endif %}">
                         {{ t.stato_approvazione_finale }}
                     </span>
                 </td>

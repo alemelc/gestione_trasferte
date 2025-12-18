@@ -1371,6 +1371,33 @@ def approva_rimborso_finale(trasferta_id):
         flash(f'Errore nel salvataggio dell\'approvazione finale: {e}', 'danger')
         
     # Reindirizza alla dashboard corretta
+    # Reindirizza alla dashboard corretta
+    return redirect(url_for('dashboard_amministrazione'))
+
+@app.route('/rifiuta_rimborso_finale/<int:trasferta_id>', methods=['POST'])
+@login_required
+@amministrazione_required
+def rifiuta_rimborso_finale(trasferta_id):
+    trasferta = Trasferta.query.get_or_404(trasferta_id)
+    
+    # Verifica stato
+    if trasferta.stato_post_missione != 'Pronta per rimborso':
+         flash(f'Impossibile rifiutare: la missione non è nello stato corretto. Stato: {trasferta.stato_post_missione}', 'danger')
+         return redirect(url_for('dashboard_amministrazione'))
+    
+    # Esegui il rifiuto finale
+    trasferta.stato_approvazione_finale = 'Non rimborsata' 
+    trasferta.stato_post_missione = 'Non rimborsata'
+    trasferta.id_approvatore_finale = current_user.id
+    trasferta.data_approvazione_finale = datetime.now()
+    
+    try:
+        db.session.commit()
+        flash('Rimborso rifiutato. Stato missione impostato su "Non rimborsata".', 'warning')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore nel rifiuto del rimborso: {e}', 'danger')
+        
     return redirect(url_for('dashboard_amministrazione'))
 
 
@@ -1725,6 +1752,13 @@ def dashboard_superuser_missioni():
     trasferte = Trasferta.query.order_by(Trasferta.id.desc()).all()
     return render_template('dashboard_superuser_missioni.html', trasferte=trasferte)
 
+# Compatibilità per URL errati/vecchi
+@app.route('/dashboard_superuser_missioni')
+@login_required
+@superuser_required
+def dashboard_superuser_missioni_legacy():
+    return redirect(url_for('dashboard_superuser_missioni'))
+
 @app.route('/dashboard_superuser/utenti')
 @login_required
 @superuser_required
@@ -2012,6 +2046,46 @@ def update_presenze_status():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/superuser/modifica_stato_missione', methods=['POST'])
+@login_required
+@superuser_required
+def superuser_modifica_stato_missione():
+    trasferta_id = request.form.get('trasferta_id')
+    nuovo_stato_pre = request.form.get('stato_pre_missione')
+    nuovo_stato_post = request.form.get('stato_post_missione')
+
+    if not trasferta_id:
+        flash('ID Missione mancante.', 'danger')
+        return redirect(url_for('dashboard_superuser'))
+
+    trasferta = Trasferta.query.get(trasferta_id)
+    if not trasferta:
+        flash('Missione non trovata.', 'danger')
+        return redirect(url_for('dashboard_superuser'))
+
+    # Logica di aggiornamento
+    vecchio_pre = trasferta.stato_pre_missione
+    vecchio_post = trasferta.stato_post_missione
+    
+    trasferta.stato_pre_missione = nuovo_stato_pre
+    trasferta.stato_post_missione = nuovo_stato_post
+    
+    # Opzionale: Aggiungi una nota automatica
+    nota_audit = f"\n[SUPERUSER AUDIT {datetime.now().strftime('%Y-%m-%d %H:%M')}] Stati modificati manualmente da {current_user.nome} {current_user.cognome}. Pre: {vecchio_pre}->{nuovo_stato_pre}, Post: {vecchio_post}->{nuovo_stato_post}."
+    if trasferta.note_premissione:
+        trasferta.note_premissione += nota_audit
+    else:
+        trasferta.note_premissione = nota_audit
+
+    try:
+        db.session.commit()
+        flash(f'Stati missione #{trasferta.id} aggiornati con successo. (Pre: {nuovo_stato_pre}, Post: {nuovo_stato_post})', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore aggiornamento stati: {e}', 'danger')
+
+    return redirect(url_for('dashboard_superuser_missioni'))
 
 if __name__ == '__main__':
     # Rimuovi questa riga se usi 'flask run'

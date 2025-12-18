@@ -66,10 +66,16 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="{{ url_for('dettagli_trasferta', trasferta_id=t.id, source='superuser_list') }}"
-                                    class="btn btn-outline-primary btn-sm" title="Vedi Dettagli">
-                                    <i class="fas fa-eye"></i> Dettagli
-                                </a>
+                                <div class="btn-group" role="group">
+                                    <a href="{{ url_for('dettagli_trasferta', trasferta_id=t.id, source='superuser_list') }}"
+                                        class="btn btn-outline-primary btn-sm" title="Vedi Dettagli">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-outline-warning btn-sm" title="Modifica Stati"
+                                        onclick="openStatusModal('{{ t.id }}', '{{ t.stato_pre_missione }}', '{{ t.stato_post_missione }}')">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -84,4 +90,70 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Modifica Stati -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">Modifica Stati Missione (SUPERUSER)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('superuser_modifica_stato_missione') }}" method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="trasferta_id" id="modalTrasfertaId">
+
+                    <div class="alert alert-info">
+                        <strong>Attenzione:</strong> Modificare manualmente gli stati può alterare il normale flusso
+                        approvativo.
+                        Usare con cautela per correggere errori.
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="statoPre" class="form-label">Stato Pre-Missione</label>
+                        <select class="form-select" name="stato_pre_missione" id="modalStatoPre">
+                            <option value="In attesa">In attesa</option>
+                            <option value="Approvata">Approvata</option>
+                            <option value="Rifiutata">Rifiutata</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="statoPost" class="form-label">Stato Post-Missione</label>
+                        <select class="form-select" name="stato_post_missione" id="modalStatoPost">
+                            <option value="N/A">N/A (Non ancora svolta)</option>
+                            <option value="In attesa">In attesa (Di approvazione post)</option>
+                            <option value="Pronta per rimborso">Pronta per rimborso</option>
+                            <option value="Conclusa">Conclusa (No spese)</option>
+                            <option value="Rifiutata post">Rifiutata post</option>
+                            <option value="Rimborsata">Rimborsata</option>
+                            <option value="Non rimborsata">Non rimborsata</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-warning">Salva Modifiche</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openStatusModal(id, pre, post) {
+        document.getElementById('modalTrasfertaId').value = id;
+        document.getElementById('modalStatoPre').value = pre;
+
+        // Gestione fallback per stati complessi o non listati, se necessario
+        // Ma il select dovrebbe mapparli correttamente se i value coincidono
+        let postSelect = document.getElementById('modalStatoPost');
+        postSelect.value = post;
+
+        // Se lo stato post non è nella lista (es. stringa strana), potremmo volerlo vedere o aggiungere
+        // Per ora ci fidiamo che siano standard.
+
+        new bootstrap.Modal(document.getElementById('statusModal')).show();
+    }
+</script>
 {% endblock %}
