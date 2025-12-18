@@ -1049,41 +1049,83 @@ def rendiconta_trasferta(trasferta_id):
             
             # --- 2. GESTIONE SPESE (Cancellazione e Reinserimento) ---
             
-            # A. ELIMINA le spese esistenti
-            Spesa.query.filter_by(id_trasferta=trasferta_id).delete()
-            db.session.flush() # Importante: esegue la cancellazione ora
-
-            # B. RECUPERA e INSERISCI le nuove spese
+            # B. Gestione Spese:
+            # Se il form contiene i dati delle spese (array), allora aggiorniamo (cancella e riscrivi).
+            # Se il form NON contiene dati (es. invia da modale), preserviamo le spese esistenti.
             categorie = request.form.getlist('spesa_categoria[]')
-            descrizioni = request.form.getlist('spesa_descrizione[]')
-            importi = request.form.getlist('spesa_importo[]')
-            date_spesa = request.form.getlist('spesa_data[]')
             
-            if len(categorie) != len(importi):
-                flash('Errore: I dati delle spese inviati non sono allineati.', 'danger')
-                raise Exception("Dati spesa non allineati.")
-            
-            for i in range(len(categorie)):
-                # Controlla che la riga non sia completamente vuota (es. la riga iniziale)
-                if not categorie[i] or not importi[i]:
-                    continue
-                    
-                data_spesa_obj = datetime.strptime(date_spesa[i], '%Y-%m-%d').date()
+            totale_spese = 0.0
 
-                nuova_spesa = Spesa(
-                    id_trasferta=trasferta_id,
-                    categoria=categorie[i],
-                    descrizione=descrizioni[i],
-                    importo=safe_float(importi[i]),
-                    data_spesa=data_spesa_obj
-                )
-                db.session.add(nuova_spesa)
+            if categorie:
+                # CI SONO NUOVI DATI: Cancelliamo le vecchie e inseriamo le nuove
+                Spesa.query.filter_by(id_trasferta=trasferta_id).delete()
                 
-            # --- 3. AGGIORNAMENTO STATO E COMMIT ---
-            trasferta.stato_post_missione = 'In attesa' # In attesa di approvazione Rimborso
+                descrizioni = request.form.getlist('spesa_descrizione[]')
+                importi = request.form.getlist('spesa_importo[]')
+                date_spesa = request.form.getlist('spesa_data[]')
+
+                for i in range(len(categorie)):
+                    # Validazione base: ignora righe vuote se necessario
+                    if not categorie[i] or not importi[i]:
+                        continue
+                        
+                    valore_importo = float(importi[i])
+                    totale_spese += valore_importo
+                    
+                    # Gestione data (se presente o usa quella della missione)
+                    data_s = trasferta.giorno_missione
+                    if i < len(date_spesa) and date_spesa[i]:
+                        try:
+                            data_s = datetime.strptime(date_spesa[i], '%Y-%m-%d').date()
+                        except ValueError:
+                            pass # Mantieni default
+
+                    nuova_spesa = Spesa(
+                        id_trasferta=trasferta_id,
+                        categoria=categorie[i],
+                        descrizione=descrizioni[i] if i < len(descrizioni) else '',
+                        importo=valore_importo,
+                        data_spesa=data_s
+                    )
+                    db.session.add(nuova_spesa)
+                
+                # Commit necessario se abbiamo modificato le spese
+                # (verrà fatto alla fin, ma è parte della logica di "scrittura")
+            else:
+                # NESSUN DATO SPESA RICEVUTO:
+                # Calcoliamo il totale dalle spese ESISTENTI nel DB.
+                spese_esistenti = Spesa.query.filter_by(id_trasferta=trasferta_id).all()
+                for s in spese_esistenti:
+                    totale_spese += s.importo
+                
+                print(f"DEBUG: Nessuna spesa ricevuta dal form. Spese preservate. Totale DB: {totale_spese}")
+                
+            # --- 3. LOGICA DI AUTO-APPROVAZIONE POST-MISSIONE E AGGIORNAMENTO STATO ---
+            
+            # Calcolo Totale Spese per la logica
+            totale_spese = sum(s.importo for s in Spesa.query.filter_by(id_trasferta=trasferta_id).all())
+
+            # Valori Default
+            stato_post_finale = 'In attesa'
+            final_flash_message = 'Rendicontazione (Dati e Spese) salvata e inviata con successo per l\'approvazione del rimborso.'
+            
+            # Condizione Auto-Approvazione
+            if current_user.ruolo == 'Dirigente' and current_user.id == current_user.id_dirigente:
+                if totale_spese > 0:
+                    stato_post_finale = 'Pronta per rimborso'
+                    final_flash_message = 'Rendiconto salvato e auto-approvato (Dirigente). Ora è pronto per il rimborso finanziario.'
+                else:
+                    stato_post_finale = 'Conclusa'
+                    final_flash_message = 'Rendiconto salvato e auto-approvato (Dirigente). Nessuna spesa da rimborsare. Missione conclusa.'
+                
+                trasferta.id_approvatore_post = current_user.id
+                trasferta.data_approvazione_post = datetime.now()
+
+            # AGGIORNAMENTO STATO E COMMIT
+            trasferta.stato_post_missione = stato_post_finale
             
             db.session.commit()
-            flash('Rendicontazione (Dati e Spese) salvata e inviata con successo per l\'approvazione del rimborso.', 'success')
+            flash(final_flash_message, 'success')
             return redirect(url_for('mie_trasferte'))
 
         except Exception as e:
@@ -1113,32 +1155,58 @@ def invia_rendiconto(trasferta_id):
         
         # --- 2. GESTIONE SPESE (NUOVA LOGICA) ---
         
-        # A. ELIMINA le spese vecchie (per gestire modifiche e cancellazioni)
-        Spesa.query.filter_by(id_trasferta=trasferta_id).delete()
-        db.session.flush() # Per assicurare che le eliminazioni siano eseguite prima dei nuovi inserimenti
-
-        # B. INSERISCI le nuove spese inviate
+        # B. Gestione Spese:
+        # Se il form contiene i dati delle spese (array), allora aggiorniamo (cancella e riscrivi).
+        # Se il form NON contiene dati (es. invia da modale), preserviamo le spese esistenti.
         categorie = request.form.getlist('spesa_categoria[]')
-        descrizioni = request.form.getlist('spesa_descrizione[]')
-        importi = request.form.getlist('spesa_importo[]')
-        date_spesa = request.form.getlist('spesa_data[]')
         
-        if len(categorie) != len(importi):
-            raise Exception("Dati spesa non allineati.")
-        
-        for i in range(len(categorie)):
-            # Ignora le righe che non sono state completate dall'utente (es. se resta la riga vuota iniziale)
-            if not categorie[i] or not importi[i]:
-                continue
+        totale_spese = 0.0
+
+        if categorie:
+            # CI SONO NUOVI DATI: Cancelliamo le vecchie e inseriamo le nuove
+            Spesa.query.filter_by(id_trasferta=trasferta_id).delete()
+            db.session.flush()
+            
+            descrizioni = request.form.getlist('spesa_descrizione[]')
+            importi = request.form.getlist('spesa_importo[]')
+            date_spesa = request.form.getlist('spesa_data[]')
+            
+            if len(categorie) != len(importi):
+                raise Exception("Dati spesa non allineati.")
+
+            for i in range(len(categorie)):
+                # Validazione base: ignora righe vuote se necessario
+                if not categorie[i] or not importi[i]:
+                    continue
+                    
+                valore_importo = float(importi[i])
+                totale_spese += valore_importo
                 
-            nuova_spesa = Spesa(
-                id_trasferta=trasferta_id,
-                categoria=categorie[i], # Nel tuo modello Spesa, il campo è probabilmente tipo_spesa
-                descrizione=descrizioni[i],
-                importo=float(importi[i]),
-                data_spesa=datetime.strptime(date_spesa[i], '%Y-%m-%d').date()
-            )
-            db.session.add(nuova_spesa)
+                # Gestione data (se presente o usa quella della missione)
+                data_s = trasferta.giorno_missione
+                if i < len(date_spesa) and date_spesa[i]:
+                    try:
+                        data_s = datetime.strptime(date_spesa[i], '%Y-%m-%d').date()
+                    except ValueError:
+                        pass # Mantieni default
+
+                nuova_spesa = Spesa(
+                    id_trasferta=trasferta_id,
+                    categoria=categorie[i],
+                    descrizione=descrizioni[i] if i < len(descrizioni) else '',
+                    importo=valore_importo,
+                    data_spesa=data_s
+                )
+                db.session.add(nuova_spesa)
+            
+            # Commit necessario se abbiamo modificato le spese
+            # (verrà fatto alla fine, ma è parte della logica di "scrittura")
+        else:
+            # NESSUN DATO SPESA RICEVUTO:
+            # Calcoliamo il totale dalle spese ESISTENTI nel DB.
+            spese_esistenti = Spesa.query.filter_by(id_trasferta=trasferta_id).all()
+            for s in spese_esistenti:
+                totale_spese += s.importo
             
         # ===================================================================================
         # --- 3. LOGICA DI AUTO-APPROVAZIONE POST-MISSIONE E AGGIORNAMENTO STATO ---
@@ -1158,12 +1226,16 @@ def invia_rendiconto(trasferta_id):
 
         if is_auto_approving_dirigente:
             # Sovrascrive i valori di default
-            stato_post_finale = 'Pronta per rimborso' # O 'Approvata' se preferisci questo termine
             id_approvatore_post_finale = current_user.id
             data_app_post_finale = datetime.now()
-            final_flash_message = 'Rendiconto salvato e auto-approvato (Dirigente). Ora è pronto per il rimborso finanziario.'
             
-            print(f"DEBUG: Auto-approvazione POST-missione scattata per Dirigente ID: {current_user.id}")
+            # NUOVO: Distinzione basata sulle spese
+            if totale_spese > 0:
+                stato_post_finale = 'Pronta per rimborso' 
+                final_flash_message = 'Rendiconto salvato e auto-approvato (Dirigente). Ora è pronto per il rimborso finanziario.'
+            else:
+                stato_post_finale = 'Conclusa'
+                final_flash_message = 'Rendiconto salvato e auto-approvato (Dirigente). Nessuna spesa da rimborsare. Missione conclusa.'
 
         # 3.3. Aggiornamento dei campi sulla Trasferta
         trasferta.stato_post_missione = stato_post_finale
@@ -1464,7 +1536,9 @@ def report_trasferta(trasferta_id):
         'Rimborso Concesso', 
         'Rimborso negato',
         'Rimborso Approvato e Liquidato', # <--- NUOVO STATO AGGIUNTO QUI
-        'Pronta per rimborso' # <--- AGGIUNTO SU RICHIESTA UTENTE
+        'Pronta per rimborso', # <--- AGGIUNTO SU RICHIESTA UTENTE
+        'Rimborsata',
+        'Conclusa'
     ]
     
     if trasferta.stato_post_missione not in STATI_FINALIZZATI:

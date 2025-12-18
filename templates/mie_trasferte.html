@@ -65,7 +65,7 @@
                     {% elif trasferta.stato_post_missione in ['Conclusa', 'Rimborsata', 'Rimborso Concesso', 'Rimborso
                     Approvato e Liquidato', 'Da rimborsare'] %}
                     <span class="badge bg-success">{{ trasferta.stato_post_missione }}</span>
-                    {% elif trasferta.stato_post_missione in ['Rimborso negato', 'Rifiutato Post'] %}
+                    {% elif trasferta.stato_post_missione in ['Rimborso negato', 'Rifiutato Post', 'Rifiutata post'] %}
                     <span class="badge bg-danger">{{ trasferta.stato_post_missione }}</span>
                     {% else %}
                     <span class="badge bg-info">{{ trasferta.stato_post_missione }}</span>
