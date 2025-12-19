@@ -2071,6 +2071,32 @@ def superuser_modifica_stato_missione():
     trasferta.stato_pre_missione = nuovo_stato_pre
     trasferta.stato_post_missione = nuovo_stato_post
     
+    # ----------------------------------------------------
+    # FIX: Sincronizzazione stato_approvazione_finale
+    # ----------------------------------------------------
+    # Se il superuser imposta manualmente uno stato finale, aggiorniamo anche il flag finale.
+    # Se imposta uno stato intermedio (es. "Pronta per rimborso"), RESETTIAMO il flag finale
+    # affinché la missione riappaia nella dashboard Amministrazione come "Da Approvare".
+    
+    if nuovo_stato_post == 'Rimborsata':
+        trasferta.stato_approvazione_finale = 'Rimborsata'
+        # Se manca la data, la mettiamo ora
+        if not trasferta.data_approvazione_finale:
+             trasferta.data_approvazione_finale = datetime.now()
+             
+    elif nuovo_stato_post == 'Non rimborsata':
+        trasferta.stato_approvazione_finale = 'Non rimborsata'
+        if not trasferta.data_approvazione_finale:
+             trasferta.data_approvazione_finale = datetime.now()
+             
+    else:
+        # Qualsiasi altro stato (In attesa, Pronta per rimborso, N/A, ecc.)
+        # NON è considerato finale dal punto di vista dell'amministrazione.
+        # Quindi resettiamo i campi finali.
+        trasferta.stato_approvazione_finale = None
+        trasferta.data_approvazione_finale = None
+        trasferta.id_approvatore_finale = None
+
     # Opzionale: Aggiungi una nota automatica
     nota_audit = f"\n[SUPERUSER AUDIT {datetime.now().strftime('%Y-%m-%d %H:%M')}] Stati modificati manualmente da {current_user.nome} {current_user.cognome}. Pre: {vecchio_pre}->{nuovo_stato_pre}, Post: {vecchio_post}->{nuovo_stato_post}."
     if trasferta.note_premissione:
