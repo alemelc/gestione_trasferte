@@ -19,6 +19,7 @@ class Dipendente(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     ruolo = db.Column(db.String(50), nullable=False, default='Dipendente') # Dipendente, Dirigente, Amministrazione
+    struttura = db.Column(db.Integer, nullable=True) # Numero della struttura/servizio assegnato (1-7)
     
     # === RELAZIONE RICORSIVA (Dirigente <-> Dipendente) ===
     # id_dirigente: La chiave esterna nel dipendente che punta all'ID del dirigente (che è un altro dipendente)

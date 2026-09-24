@@ -25,36 +25,52 @@
                     <h5 class="mb-0">Crea Nuova Delega</h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('gestisci_deleghe') }}">
-                        {{ form.hidden_tag() }}
-                        
-                        <div class="mb-3">
-                            {{ form.delegato_id.label(class="form-label") }}
-                            {{ form.delegato_id(class="form-select") }}
-                            {% for error in form.delegato_id.errors %}
-                                <div class="text-danger small mt-1">{{ error }}</div>
-                            {% endfor %}
+                    {% if not current_user.struttura %}
+                        <div class="alert alert-warning mb-0">
+                            <strong><i class="fas fa-exclamation-triangle"></i> Attenzione:</strong> Non hai una struttura/servizio assegnata. Contatta il Superuser per farti assegnare la tua struttura (da 1 a 7) prima di poter delegare.
                         </div>
-                        
-                        <div class="mb-3">
-                            {{ form.data_inizio.label(class="form-label") }}
-                            {{ form.data_inizio(class="form-control") }}
-                            {% for error in form.data_inizio.errors %}
-                                <div class="text-danger small mt-1">{{ error }}</div>
-                            {% endfor %}
+                    {% else %}
+                        <div class="alert alert-info py-2 mb-3">
+                            <small><strong><i class="fas fa-building"></i> La tua struttura:</strong> Servizio {{ current_user.struttura }} (Struttura {{ current_user.struttura }})</small>
                         </div>
-                        
-                        <div class="mb-3">
-                            {{ form.data_fine.label(class="form-label") }}
-                            {{ form.data_fine(class="form-control") }}
-                            <small class="form-text text-muted">Lascia vuoto per una delega a tempo indeterminato (fino a revoca).</small>
-                            {% for error in form.data_fine.errors %}
-                                <div class="text-danger small mt-1">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        
-                        {{ form.submit(class="btn btn-success w-100") }}
-                    </form>
+                        {% if not form.delegato_id.choices %}
+                            <div class="alert alert-secondary mb-0">
+                                <i class="fas fa-info-circle"></i> Nessun dipendente delegabile trovato per la tua struttura (Servizio {{ current_user.struttura }}).
+                            </div>
+                        {% else %}
+                            <form method="POST" action="{{ url_for('gestisci_deleghe') }}">
+                                {{ form.hidden_tag() }}
+                                
+                                <div class="mb-3">
+                                    {{ form.delegato_id.label(class="form-label") }}
+                                    {{ form.delegato_id(class="form-select") }}
+                                    <small class="form-text text-muted">Mostra solo i dipendenti del Servizio {{ current_user.struttura }}.</small>
+                                    {% for error in form.delegato_id.errors %}
+                                        <div class="text-danger small mt-1">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    {{ form.data_inizio.label(class="form-label") }}
+                                    {{ form.data_inizio(class="form-control") }}
+                                    {% for error in form.data_inizio.errors %}
+                                        <div class="text-danger small mt-1">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    {{ form.data_fine.label(class="form-label") }}
+                                    {{ form.data_fine(class="form-control") }}
+                                    <small class="form-text text-muted">Lascia vuoto per una delega a tempo indeterminato (fino a revoca).</small>
+                                    {% for error in form.data_fine.errors %}
+                                        <div class="text-danger small mt-1">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                
+                                {{ form.submit(class="btn btn-success w-100") }}
+                            </form>
+                        {% endif %}
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -70,7 +86,12 @@
                         <ul class="list-group">
                             {% for delega in deleghe_attive %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <span class="fw-bold">{{ delega.delegato.nome }} {{ delega.delegato.cognome }}</span>
+                                    <div>
+                                        <span class="fw-bold">{{ delega.delegato.nome }} {{ delega.delegato.cognome }}</span>
+                                        {% if delega.delegato.struttura %}
+                                            <span class="badge bg-secondary ms-1">Servizio {{ delega.delegato.struttura }}</span>
+                                        {% endif %}
+                                    </div>
                                     <span class="text-muted small mx-3">
                                         Dal {{ delega.data_inizio.strftime('%d/%m/%Y') }} 
                                         {% if delega.data_fine %}

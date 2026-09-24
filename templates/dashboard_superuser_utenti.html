@@ -21,6 +21,7 @@
                             <th>Utente</th>
                             <th>Email</th>
                             <th>Ruolo</th>
+                            <th>Struttura (1-7)</th>
                             <th>Password</th>
                         </tr>
                     </thead>
@@ -47,6 +48,20 @@
                                             Superuser</option>
                                     </select>
                                     <button type="submit" class="btn btn-sm btn-outline-success">Aggiorna</button>
+                                </form>
+                            </td>
+                            <td>
+                                <form method="POST" action="{{ url_for('aggiorna_struttura', dipendente_id=d.id) }}"
+                                    class="d-flex align-items-center">
+                                    <select name="struttura" class="form-select form-select-sm me-2" style="width: auto;">
+                                        <option value="" {% if not d.struttura %}selected{% endif %}>-- Nessuna --</option>
+                                        {% for s in range(1, 8) %}
+                                        <option value="{{ s }}" {% if d.struttura == s %}selected{% endif %}>
+                                            Struttura {{ s }} (Servizio {{ s }})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">Salva</button>
                                 </form>
                             </td>
                             <td>

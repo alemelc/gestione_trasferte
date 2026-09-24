@@ -124,6 +124,17 @@ except OSError:
 # 4. INIZIALIZZAZIONE DELLE ESTENSIONI
 db.init_app(app) # Collega l'istanza 'db' importata
 migrate = Migrate(app, db)
+
+# Auto-allineamento schema per ambienti cloud (PostgreSQL su Vercel/Render)
+with app.app_context():
+    try:
+        if db_url and 'postgresql' in db_url:
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE dipendente ADD COLUMN IF NOT EXISTS struttura INTEGER;"))
+                conn.commit()
+    except Exception as e:
+        print(f"Nota auto-migrazione Postgres: {e}")
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 
@@ -475,19 +486,32 @@ from datetime import date, datetime # IMPORTANTE: Assicurati che datetime sia im
 @app.route('/gestisci_deleghe', methods=['GET', 'POST'])
 @login_required
 def gestisci_deleghe():
+    # --- LOGICA DI SICUREZZA ---
+    if current_user.ruolo != 'Dirigente':
+        flash('Accesso non autorizzato alla gestione delle deleghe.', 'danger')
+        return redirect(url_for('mie_trasferte'))
+
     # --- PREPARAZIONE DATI PER IL TEMPLATE (NECESSARI ANCHE IN CASO DI ERRORE POST) ---
     oggi = date.today()
     
     # 1. Inizializzazione del Form
-    from forms import DelegaForm # Assicurati che il tuo form sia importato
+    from forms import DelegaForm
     form = DelegaForm() 
 
-    # 2. Dipendenti idonei a ricevere la delega (escludiamo se stesso)
+    # 2. Dipendenti idonei a ricevere la delega (SOLO stessa struttura del Dirigente, escluso se stesso)
     from models import Dipendente 
-    potenziali_delegati = Dipendente.query.filter(Dipendente.id != current_user.id).all()
-    
-    # Popola il campo SelectField del form
-    form.delegato_id.choices = [(d.id, f"{d.nome} {d.cognome} ({d.ruolo})") for d in potenziali_delegati]
+    if current_user.struttura is not None:
+        potenziali_delegati = Dipendente.query.filter(
+            Dipendente.id != current_user.id,
+            Dipendente.struttura == current_user.struttura
+        ).order_by(Dipendente.cognome.asc(), Dipendente.nome.asc()).all()
+        
+        # Popola il campo SelectField del form
+        form.delegato_id.choices = [(d.id, f"{d.cognome} {d.nome} ({d.ruolo})") for d in potenziali_delegati]
+    else:
+        potenziali_delegati = []
+        form.delegato_id.choices = []
+        flash('Attenzione: Nessuna struttura/servizio assegnata al tuo profilo. Contatta il Superuser per farti assegnare la struttura.', 'warning')
 
     # 3. Query per Deleghe (Attive/Future e Scadute)
     from models import Delega 
@@ -504,15 +528,8 @@ def gestisci_deleghe():
         Delega.data_fine < oggi
     ).order_by(Delega.data_fine.desc()).all()
 
-
-    # --- LOGICA DI SICUREZZA e VALIDAZIONE ---
-    if current_user.ruolo != 'Dirigente':
-        flash('Accesso non autorizzato alla gestione delle deleghe.', 'danger')
-        return redirect(url_for('mie_trasferte'))
-
     if form.validate_on_submit():
         # Creazione nuova Delega
-        
         id_delegato = form.delegato_id.data
         data_inizio = form.data_inizio.data
         data_fine = form.data_fine.data
@@ -520,27 +537,32 @@ def gestisci_deleghe():
         # Controllo base: Data fine deve essere successiva o uguale a data inizio
         if data_fine and data_fine < data_inizio:
             flash('La data di fine delega non può precedere la data di inizio.', 'danger')
-            # Non facciamo return, lasciamo che il template venga renderizzato con gli errori del form
+        elif not current_user.struttura:
+            flash('Non puoi creare deleghe senza avere una struttura assegnata.', 'danger')
         else:
-            try:
-                nuova_delega = Delega(
-                    id_delegante=current_user.id,
-                    id_delegato=id_delegato,
-                    data_inizio=data_inizio,
-                    data_fine=data_fine
-                )
-                
-                db.session.add(nuova_delega)
-                db.session.commit()
-                flash('Nuova delega creata con successo.', 'success')
-                return redirect(url_for('gestisci_deleghe'))
+            # Controllo di sicurezza: il delegato deve appartenere alla stessa struttura
+            delegato = Dipendente.query.get(id_delegato)
+            if not delegato or delegato.id == current_user.id or delegato.struttura != current_user.struttura:
+                flash('Non sei autorizzato a delegare questo utente: appartiene a un\'altra struttura o non esiste.', 'danger')
+            else:
+                try:
+                    nuova_delega = Delega(
+                        id_delegante=current_user.id,
+                        id_delegato=id_delegato,
+                        data_inizio=data_inizio,
+                        data_fine=data_fine
+                    )
+                    
+                    db.session.add(nuova_delega)
+                    db.session.commit()
+                    flash(f'Nuova delega creata con successo a favore di {delegato.nome} {delegato.cognome}.', 'success')
+                    return redirect(url_for('gestisci_deleghe'))
 
-            except Exception as e:
-                db.session.rollback()
-                flash(f'Errore nel salvataggio della delega: {e}', 'danger')
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f'Errore nel salvataggio della delega: {e}', 'danger')
 
     # --- RENDER TEMPLATE ---
-    # Passiamo tutte le variabili necessarie
     return render_template('gestisci_deleghe.html', 
                             form=form, 
                             deleghe_attive=deleghe_attive, 
@@ -1788,6 +1810,41 @@ def aggiorna_ruolo(dipendente_id):
         flash('Ruolo non valido.', 'warning')
         
     return redirect(url_for('dashboard_superuser_utenti')) # Correggo anche il redirect qui per tornare alla lista
+
+@app.route('/aggiorna_struttura/<int:dipendente_id>', methods=['POST'])
+@login_required
+@superuser_required
+def aggiorna_struttura(dipendente_id):
+    from models import Dipendente
+    dipendente = Dipendente.query.get_or_404(dipendente_id)
+    
+    valore = request.form.get('struttura')
+    
+    if valore and valore.strip():
+        try:
+            num = int(valore.strip())
+            if 1 <= num <= 7:
+                dipendente.struttura = num
+                db.session.commit()
+                flash(f'Struttura {num} assegnata con successo a {dipendente.nome} {dipendente.cognome}.', 'success')
+            else:
+                flash('Il numero della struttura deve essere compreso tra 1 e 7.', 'warning')
+        except ValueError:
+            flash('Valore della struttura non valido.', 'danger')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Errore durante l\'aggiornamento della struttura: {e}', 'danger')
+    else:
+        # Se vuoto o non selezionato, rimuove l'assegnazione
+        dipendente.struttura = None
+        try:
+            db.session.commit()
+            flash(f'Struttura rimossa per {dipendente.nome} {dipendente.cognome}.', 'info')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Errore durante l\'aggiornamento della struttura: {e}', 'danger')
+            
+    return redirect(url_for('dashboard_superuser_utenti'))
 
 @app.route('/admin_reset_password/<int:dipendente_id>', methods=['POST'])
 @login_required
